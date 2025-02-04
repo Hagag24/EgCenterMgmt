@@ -1,0 +1,216 @@
+﻿@page "/student-booking"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>إضافة طالب جديد وعمل حجز</PageTitle>
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">@("تعديل الطالب")</h5>
+        </div>
+        <div class="card-body">
+            @if (studentDto == null || grades == null)
+            {
+                <p><em>جار التحميل...</em></p>
+            }
+            else
+            {
+                <EditForm Model="studentDto" OnValidSubmit="HandleValidSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <!-- معلومات الطالب -->
+                    <div class="mb-3">
+                        <label for="studentName" class="form-label">اسم الطالب</label>
+                        <InputText id="studentName" class="form-control" @bind-Value="studentDto.StudentName" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="gradeId" class="form-label">الصف الدراسي</label>
+                        <select id="gradeId" class="form-select" @bind="studentDto.GradeId">
+                            <option value="">اختر الصف</option>
+                            @foreach (var grade in grades)
+                            {
+                                <option value="@grade.GradeId">@grade.GradeName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="gender" class="form-label">النوع</label>
+                        <Switch id="gender" @bind-Value="studentDto.IsMaile" Label="ذكر / أنثى" Reverse="true" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="studentEmail" class="form-label">البريد الإلكتروني</label>
+                        <InputText id="studentEmail" class="form-control" @bind-Value="studentDto.StudentEmail" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="studentPhone" class="form-label">رقم الهاتف</label>
+                        <InputText id="studentPhone" class="form-control" @bind-Value="studentDto.StudentPhone" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="studentWhatsApp" class="form-label">واتساب الطالب</label>
+                        <InputText id="studentWhatsApp" class="form-control" @bind-Value="studentDto.StudentWhatsApp" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="fatherWhatsApp" class="form-label">واتساب الأب</label>
+                        <InputText id="fatherWhatsApp" class="form-control" @bind-Value="studentDto.FatherWhatsApp" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="county" class="form-label">البلد</label>
+                        <InputText id="county" class="form-control" @bind-Value="studentDto.Country" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="studentStatus" class="form-label">حالة الطالب</label>
+                        <Switch id="studentStatus" @bind-Value="studentDto.IStatus" Label="مرفوض / ملتزم" Reverse="true" />
+                    </div>
+
+                    <!-- معلومات الحجز -->
+                    <div class="mb-3">
+                        <label for="groupId" class="form-label">إسم المجموعة</label>
+                        <input id="groupId" class="form-control" @oninput="FilterGroups" placeholder="ابحث عن المجموعة ...." @onclick="() => isGroupDropdownOpen = true" />
+                        <select id="groupDropdown" class="form-control" style="display:@GetDropdownDisplay(isGroupDropdownOpen)" @bind="studentDto.GroupId">
+                            <option value="">اختر المجموعة</option>
+                            @if (filteredGroups != null && studentDto.GradeId != null)
+                            {
+                                @foreach (var group in filteredGroups)
+                                {
+                                    <option value="@group.GroupId">@group.GroupName</option>
+                                }
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bookingDate" class="form-label">تاريخ الحجز</label>
+                        <InputDate id="bookingDate" class="form-control" @bind-Value="studentDto.BookingDate" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="paymentType" class="form-label">نوع الدفع</label>
+                        <InputSelect id="paymentType" class="form-control" @bind-Value="studentDto.PaymentType" @onclick="@(async (e) => grouphaspayment(studentDto.GroupId))">
+                            <option value="">اختر نوع الدفع</option>
+                            @if (GroupHasMonthlyPayments > 0)
+                            {
+                                <option value="شهري">شهري</option>
+                            }
+                            @if (GroupHasLessonPayments > 0)
+                            {
+                                <option value="حصة">حصة</option>
+                            }
+                            <option value="معفي">معفي</option>
+                            <option value="معفي من المعلم">معفي من المعلم</option>
+                        </InputSelect>
+                    </div>
+
+                    <div class="mb-3">
+                        <button type="submit" class="btn btn-success">إنشاء</button>
+                        <button type="button" class="btn btn-secondary" @onclick="Cancel">إلغاء</button>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+
+    <Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+</div>
+
+@code {
+    private StudentBookingDto studentDto = new StudentBookingDto();
+    private List<GradeDto>? grades = new();
+    private IEnumerable<GroupDto>? groups;
+    private List<ToastMessage> messages = new();
+    private List<GroupDto> filteredGroups = new();
+
+    private bool isStudentDropdownOpen = false;
+    private bool isGroupDropdownOpen = false;
+
+    private decimal GroupHasMonthlyPayments = 0;
+    private decimal GroupHasLessonPayments = 0;
+
+    private void FilterGroups(ChangeEventArgs e)
+    {
+        string filterValue = e.Value?.ToString()?.ToLower() ?? string.Empty;
+        filteredGroups = string.IsNullOrWhiteSpace(filterValue)
+            ? groups!.ToList()
+            : groups!.Where(g => g.GroupName!.ToLower().Contains(filterValue) && g.GradeId == studentDto.GradeId).ToList();
+        isGroupDropdownOpen = true;
+        StateHasChanged();
+    }
+
+    private string GetDropdownDisplay(bool isOpen)
+    {
+        if (isGroupDropdownOpen)
+        {
+            filteredGroups = filteredGroups!.Where(f => f.GradeId == studentDto?.GradeId).ToList();
+        }
+
+        return isOpen ? "block" : "none";
+    }
+    private async Task HandleValidSubmit()
+    {
+        var response = await Http.PostAsJsonAsync("api/Student/PostStudent", studentDto);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var createdStudent = await response.Content.ReadFromJsonAsync<StudentDto>();
+
+            // هنا يمكنك إجراء عملية الحجز بعد إضافة الطالب
+            var bookingDto = new RegesterBookingDto
+                {
+                    StudentId = createdStudent!.StudentId,
+                    GroupId = studentDto.GroupId,
+                    BookingDate = studentDto.BookingDate,
+                    PaymentType = studentDto.PaymentType
+                };
+
+            var bookingResponse = await Http.PostAsJsonAsync("api/Booking/PostBooking", bookingDto);
+
+            if (bookingResponse.IsSuccessStatusCode)
+            {
+                messages.Add(new ToastMessage { Message = "تم إضافة الطالب والحجز بنجاح!", Type = ToastType.Success });
+            }
+            else
+            {
+                messages.Add(new ToastMessage { Message = "تم إضافة الطالب ولكن حدث خطأ في عملية الحجز!", Type = ToastType.Danger });
+            }
+        }
+        else
+        {
+            messages.Add(new ToastMessage { Message = "خطأ في إضافة الطالب!", Type = ToastType.Danger });
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/students");
+    }
+    private void grouphaspayment(int? id)
+    {
+        var gradeDto = groups!.FirstOrDefault(g => g.GroupId == id);
+        if (gradeDto != null)
+        {
+            if (gradeDto.ServingPrice != 0)
+            {
+                GroupHasLessonPayments = gradeDto.ServingPrice;
+            }
+            else
+            {
+                GroupHasLessonPayments = 0;
+            }
+            if (gradeDto.Pricepermonth != 0)
+            {
+                GroupHasMonthlyPayments = gradeDto.Pricepermonth;
+            }
+            else
+            {
+                GroupHasMonthlyPayments = 0;
+            }
+            StateHasChanged();
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        grades = await Http.GetFromJsonAsync<List<GradeDto>>("api/Grade/GetGrades");
+        groups = await Http.GetFromJsonAsync<List<GroupDto>>("api/Group/GetGroups");
+    }
+}

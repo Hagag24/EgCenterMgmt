@@ -1,0 +1,216 @@
+﻿@page "/expenses"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>النفقات</PageTitle>
+
+<h3>النفقات</h3>
+
+<Button Color="ButtonColor.Success" Class="mb-3" @onclick="CreateExpense">إضافة مصروف جديدة</Button>
+
+@if (expenses == null)
+{
+    <p><em>جار التحميل...</em></p>
+}
+else
+{
+
+    <Card Class="mb-3">
+        <CardHeader>
+            <h5>إجمالي المصروفات</h5>
+        </CardHeader>
+        <CardBody>
+            <h6>@totalAmount.ToString("C")</h6>
+        </CardBody>
+    </Card>
+
+    <Modal @ref="modal" Title="تأكيد حذف المصروف">
+        <BodyTemplate>
+            <h5>هل تريد حذف المصروف <strong>@ExpenseDescription</strong>؟</h5>
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="OnHideModalClick">رجوع</Button>
+            <Button Color="ButtonColor.Danger" @onclick="() => DeleteExpense(ExpenseID)">حذف</Button>
+        </FooterTemplate>
+    </Modal>
+
+    <Grid TItem="VExpenses"
+          DataProvider="ExpensesDataProvider"
+          AllowFiltering="true"
+          Class="table-hover table"
+          FiltersRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-25"
+          HeaderRowCssClass="bg-primary text-white border-bottom-0"
+          PageSize="150"
+          AllowSorting="true"
+          AllowPaging="true"
+          Responsive="true">
+        <GridColumns>
+            <GridColumn TItem="VExpenses" HeaderText="كود المصروف" PropertyName="ExpenseId">
+                @context.ExpenseId
+            </GridColumn>
+            <GridColumn TItem="VExpenses" HeaderText="وصف المصروف" PropertyName="Description">
+                @context.Description
+            </GridColumn>
+            <GridColumn TItem="VExpenses" HeaderText="المبلغ" PropertyName="Amount">
+                @context.Amount
+            </GridColumn>
+            <GridColumn TItem="VExpenses" HeaderText="التاريخ" PropertyName="Date">
+                @context.Date.ToShortDateString()
+            </GridColumn>
+            <GridColumn TItem="VExpenses" HeaderText="الفئة" PropertyName="Category">
+                @context.Category
+            </GridColumn>
+            <GridColumn TItem="VExpenses" HeaderText="الدافع" PropertyName="Payee">
+                @context.Payee
+            </GridColumn>
+            <GridColumn TItem="VExpenses" HeaderText="اسم المستخدم" PropertyName="UserName">
+                @context.UserName
+            </GridColumn>
+            <GridColumn TItem="VExpenses" HeaderText="تعديل" PropertyName="Operations">
+                <Button Color="ButtonColor.Primary" @onclick="() => EditExpense(context.ExpenseId)">تعديل</Button>
+            </GridColumn>
+            <GridColumn TItem="VExpenses" HeaderText="حذف" PropertyName="Operations">
+                <Button Color="ButtonColor.Danger" @onclick="() => OnShowModalClick(context)">حذف</Button>
+            </GridColumn>
+        </GridColumns>
+    </Grid>
+}
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    private Modal modal = default!;
+    private List<VExpenses>? expenses;
+    private List<VExpenses>? Filterexpenses;
+    private List<ToastMessage> messages = new();
+
+    public int ExpenseID { get; set; }
+    public string? ExpenseDescription { get; set; }
+    private decimal totalAmount;
+
+    private async Task<GridDataProviderResult<VExpenses>> ExpensesDataProvider(GridDataProviderRequest<VExpenses> request)
+    {
+        try
+        {
+            if (expenses is null)
+            {
+                expenses = await Http.GetFromJsonAsync<List<VExpenses>>("api/Expenses/GetAllExpenses");
+            }
+
+            // تحويل القائمة إلى IQueryable لتطبيق الفلاتر بسهولة
+            var query = expenses!.AsQueryable();
+            Console.WriteLine("Before filtering: " + query.Count());  // عدد العناصر قبل الفلترة
+
+            // تطبيق الفلاتر إذا كانت موجودة
+            if (request.Filters != null && request.Filters.Any())
+            {
+                foreach (var filter in request.Filters)
+                {
+                    var filterValue = filter.Value?.ToString();
+                    if (string.IsNullOrEmpty(filterValue))
+                        continue;
+
+                    filterValue = filterValue.Trim().ToLower();
+
+                    query = query.Where(e =>
+                        (!string.IsNullOrEmpty(e.Description) && e.Description.ToLower().Contains(filterValue)) ||
+                        e.Amount.ToString().Contains(filterValue) ||
+                        (e.Date != default && e.Date.ToString("yyyy-MM-dd").Contains(filterValue)) ||
+                        (!string.IsNullOrEmpty(e.Category) && e.Category.ToLower().Contains(filterValue)) ||
+                        (!string.IsNullOrEmpty(e.Payee) && e.Payee.ToLower().Contains(filterValue)) ||
+                        (!string.IsNullOrEmpty(e.UserName) && e.UserName.ToLower().Contains(filterValue))
+                    );
+
+                }
+            }
+
+            // تطبيق الفلاتر وحساب المجموع
+            Filterexpenses = query.ToList();
+
+
+            // تحقق من عدد العناصر بعد الفلترة
+            Console.WriteLine("Filtered expenses count: " + Filterexpenses.Count());  // عدد النتائج بعد الفلترة
+
+            // حساب إجمالي المصروفات بعد تطبيق الفلتر
+            totalAmount = Filterexpenses.Sum(f => f.Amount);
+            Console.WriteLine($"Total Amount after filter: {totalAmount}");
+
+            // تحديث واجهة المستخدم
+            StateHasChanged();
+
+            // إرجاع النتيجة بعد تطبيق الفلاتر
+            var result = request.ApplyTo(Filterexpenses ?? Enumerable.Empty<VExpenses>());
+            return await Task.FromResult(result);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error: " + ex.Message);
+            return await Task.FromResult(request.ApplyTo(Enumerable.Empty<VExpenses>()));
+        }
+    }
+
+
+
+    private async Task OnShowModalClick(VExpenses expense)
+    {
+        ExpenseID = expense.ExpenseId;
+        ExpenseDescription = expense.Description;
+        await modal.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+        ExpenseID = 0;
+        ExpenseDescription = null;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        expenses = await Http.GetFromJsonAsync<List<VExpenses>>("api/Expenses/GetAllExpenses");
+    }
+
+    private void EditExpense(int id)
+    {
+        Navigation.NavigateTo($"/expense?id={id}");
+    }
+
+    private async Task DeleteExpense(int id)
+    {
+        var response = await Http.DeleteAsync($"api/Expenses/DeleteExpense?id={id}");
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم حذف المصروف بنجاح.");
+            expenses = await Http.GetFromJsonAsync<List<VExpenses>>("api/Expenses/GetAllExpenses");
+        }
+        else
+        {
+            string errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشل في حذف المصروف. الخطأ: {errorMessage}");
+        }
+        await OnHideModalClick();
+    }
+
+    private void CreateExpense()
+    {
+        Navigation.NavigateTo("/expense");
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(CreateToastMessage(toastType, message));
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    {
+        return new ToastMessage
+            {
+                Type = toastType,
+                Title = "عملية الحذف",
+                HelpText = $"{DateTime.Now}",
+                Message = message,
+            };
+    }
+}

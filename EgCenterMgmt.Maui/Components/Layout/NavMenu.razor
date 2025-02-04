@@ -1,0 +1,108 @@
+﻿@* @inject NavigationManager Navigation
+
+<head>
+    <!-- الروابط الخاصة بالخطوط -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+</head>
+
+<Offcanvas @ref="offcanvas" Size="OffcanvasSize.Small">
+    <BodyTemplate>
+        <div class="mt-3">
+            <ul class="nav flex-column">
+                @foreach (var navItem in navItems!)
+                {
+                    <li class="nav-item">
+                        <a class="nav-link" href="@navItem.Href" @onclick="() => OnTabClick(navItem.Href)">
+                            <span class="material-icons-outlined">
+                                <Icon Name="@navItem.IconName"></Icon>
+                            </span>
+                            @navItem.Text
+                        </a>
+                    </li>
+                }
+            </ul>
+        </div>
+        <div class="mt-3">
+            <Button Color="ButtonColor.Primary" @onclick="OnHideOffcanvasClick">
+                <Icon Name="IconName.LayerBackward" />
+                إغلاق
+            </Button>
+        </div>
+    </BodyTemplate>
+</Offcanvas>
+
+
+<div class="stage">
+    <div>
+        <div class="tabbar @tabStyle">
+            <ul class="flex-center full-width">
+                @if (navItems != null && navItems.Any())
+                {
+                    @foreach (var navItem in navItems)
+                    {
+                        if (ShouldDisplayNavItem(navItem))
+                        {
+                                <li class="@GetTabClass(navItem.Id) nav-item" data-where="@navItem.Id" @onclick="() => OnTabClick(navItem.Href)">
+                                    <span class="material-icons-outlined">
+                                        <Icon Name="@navItem.IconName"></Icon>
+                                    </span>
+                                </li>
+                        }
+                    }
+
+                    <li @onclick="OnShowOffcanvasClick" class="menu-icon">
+                        <span class="material-icons-outlined">
+                            <Icon Name="IconName.MenuApp" /> <!-- أيقونة المنيو -->
+                        </span>
+                    </li>
+                }
+                else
+                {
+                    <li class="no-items">لا توجد عناصر تنقل متاحة.</li>
+                }
+            </ul>
+
+
+        </div>
+    </div>
+</div>
+
+@code {
+    string tabStyle = "tab-style4";
+    private Offcanvas offcanvas = default!;
+    private string ActiveTab = "home";
+
+    [Parameter]
+    public IEnumerable<NavItem>? navItems { get; set; }  // يجب أن تكون هنا
+
+    private async Task OnShowOffcanvasClick() => await offcanvas.ShowAsync();
+    private async Task OnHideOffcanvasClick() => await offcanvas.HideAsync();
+
+    private void OnTabClick(string href)
+    {
+        if (href != Navigation.Uri)
+        {
+            Navigation.NavigateTo(href);
+            ActiveTab = href; // تحديث الحالة النشطة
+            StateHasChanged();
+        }
+    }
+
+    private string GetTabClass(string id)
+    {
+        return id == ActiveTab ? "active" : "";
+    }
+    private bool ShouldDisplayNavItem(NavItem navItem)
+    {
+        if (navItems.Count() < 7)
+        {
+            return navItem.Id == "1" || navItem.Id == "5" || navItem.Id == "6";
+        }
+        else
+        {
+            return navItem.Id == "1" || navItem.Id == "10" || navItem.Id == "14";
+        }
+    }
+}
+ *@

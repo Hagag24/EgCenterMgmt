@@ -1,0 +1,304 @@
+﻿@inherits LayoutComponentBase
+
+@inject IAccountManagement AccountManagement
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+<style>
+    html, body {
+        font-family: "Cairo", sans-serif;
+        font-optical-sizing: auto;
+        font-weight: 700;
+        font-style: normal;
+    }
+
+    .nav-link-icon {
+        margin-right: 0.5rem !important;
+    }
+
+    .nav-link-text {
+        margin-right: 15px;
+    }
+
+    .nav-link-arrow {
+        display: none;
+    }
+
+</style>
+<div class="bb-page">
+    <Sidebar @ref="sidebar"
+              Href="/"
+              Title="Smart Academy"
+              DataProvider="Sidebar2DataProvider" />
+    <main>
+        <div class="bb-top-row px-4 d-flex justify-content-between">
+            <Icon Name="IconName.List" role="button" @onclick="ToggleSidebar" />
+            <Button Style="background-color: #712cf9; color: white;" @onclick="Logout">Logout</Button>
+        </div>
+
+        <article class="content px-4">
+            <div class="py-2">@Body</div>
+        </article>
+    </main>
+</div>
+
+@code {
+    Sidebar? sidebar = default!;
+    IEnumerable<NavItem>? navItems;
+
+    protected override void OnInitialized()
+    {
+        var userRole = UserDaitels.Roles;
+        if (userRole.Any(r => r == "SuperAdmin"))
+        {
+            navItems = GetNavItemsSuper();
+        }
+        else if (userRole.Any(r => r == "Admin"))
+        {
+            navItems = GetNavItems(); 
+        }
+        else if (userRole.Any(r => r == "Assistant"))
+        {
+            navItems = GetNavItems2();
+        }
+
+    }
+
+    private async Task<SidebarDataProviderResult> Sidebar2DataProvider(SidebarDataProviderRequest request)
+    {
+        return await Task.FromResult(request.ApplyTo(navItems!));
+    }
+    private void ToggleSidebar() => sidebar!.ToggleSidebar();
+
+    private IEnumerable<NavItem> GetNavItemsSuper()
+    {
+        navItems = new List<NavItem>
+    {
+        // الرئيسية
+        new NavItem { Id = "1", Href = "/", IconName = IconName.HouseDoorFill, Text = "الرئيسية", Match = NavLinkMatch.All },
+
+        // الفروع
+        new NavItem { Id = "2", IconName = IconName.Building, Text = "الفروع",IconColor = IconColor.Success },
+        new NavItem { Id = "21", Href = "/branches", IconName = IconName.List, Text = "عرض الفروع", ParentId = "2" },
+        new NavItem { Id = "22", Href = "/branch", IconName = IconName.PersonPlus, Text = "إضافة فرع", ParentId = "2" },
+
+        // الصفوف
+        new NavItem { Id = "5", IconName = IconName.Grid, Text = "الصفوف" },
+        new NavItem { Id = "51", Href = "/grades", IconName = IconName.List, Text = "عرض الصفوف", ParentId = "5" },
+        new NavItem { Id = "52", Href = "/grade", IconName = IconName.PersonPlus, Text = "إضافة صف", ParentId = "5" },
+
+        // المواد
+        new NavItem { Id = "6", IconName = IconName.Book, Text = "المواد" },
+        new NavItem { Id = "61", Href = "/subjects", IconName = IconName.List, Text = "عرض المواد", ParentId = "6" },
+        new NavItem { Id = "62", Href = "/subject", IconName = IconName.PersonPlus, Text = "إضافة مادة", ParentId = "6" },
+
+        // المدرسين
+        new NavItem { Id = "3", IconName = IconName.PersonCircle, Text = "المدرسين" },
+        new NavItem { Id = "31", Href = "/teachers", IconName = IconName.List, Text = "عرض المدرسين", ParentId = "3" },
+        new NavItem { Id = "32", Href = "/teacher", IconName = IconName.PersonPlus, Text = "إضافة مدرس", ParentId = "3" },
+
+        // الطلاب
+        new NavItem { Id = "4", IconName = IconName.People, Text = "الطلاب" },
+        new NavItem { Id = "41", Href = "/students", IconName = IconName.List, Text = "عرض الطلاب", ParentId = "4" },
+        new NavItem { Id = "42", Href = "/student", IconName = IconName.PersonPlus, Text = "إضافة طالب", ParentId = "4" },
+        new NavItem { Id = "43", Href = "/student-booking", IconName = IconName.PersonPlus, Text = "إضافة طالب مع الحجز", ParentId = "4" },
+
+                // المجموعات
+        new NavItem { Id = "7", IconName = IconName.PeopleFill, Text = "المجموعات" },
+        new NavItem { Id = "71", Href = "/groups", IconName = IconName.List, Text = "عرض المجموعات", ParentId = "7" },
+        new NavItem { Id = "72", Href = "/group", IconName = IconName.PersonPlus, Text = "إضافة مجموعة", ParentId = "7" },
+
+
+        // جداول المجموعات
+        new NavItem { Id = "8", IconName = IconName.Calendar, Text = "جداول المجموعات" },
+        new NavItem { Id = "81", Href = "/groupschedules", IconName = IconName.List, Text = "عرض الجداول", ParentId = "8" },
+        new NavItem { Id = "82", Href = "/groupschedule", IconName = IconName.PersonPlus, Text = "إضافة جدول", ParentId = "8" },
+
+        // حجوزات الطلاب
+        new NavItem { Id = "9", IconName = IconName.CalendarCheck, Text = "حجوزات الطلاب" },
+        new NavItem { Id = "91", Href = "/Bookings", IconName = IconName.List, Text = "عرض الحجوزات", ParentId = "9" },
+        new NavItem { Id = "92", Href = "/Bookings/createoredit", IconName = IconName.PersonPlus, Text = "إضافة حجز", ParentId = "9" },
+
+        // مدفوعات الطلاب
+        new NavItem { Id = "10", IconName = IconName.CashStack, Text = "مدفوعات الطلاب" },
+        new NavItem { Id = "101", Href = "/Payments", IconName = IconName.List, Text = "عرض المدفوعات", ParentId = "10" },
+
+        // الحضور
+        new NavItem { Id = "11", IconName = IconName.Clock, Text = "الحضور" },
+        new NavItem { Id = "111", Href = "/attendances", IconName = IconName.List, Text = "تسجيل الحضور", ParentId = "11" },
+        new NavItem { Id = "115", Href = "/reportvattendances", IconName = IconName.Pencil, Text = "كشف حضور", ParentId = "11" },
+
+        // تسجيلات الحضور الملغية
+        new NavItem { Id = "12", IconName = IconName.Pencil, Text = "تسجيلات الحضور الملغية" },
+        new NavItem { Id = "121", Href = "/AttendanceCancellations", IconName = IconName.List, Text = "عرض تسجيلات الحضور الملغية", ParentId = "12" },
+
+        // المصروفات
+        new NavItem { Id = "13", IconName = IconName.Pencil, Text = "المصروفات" },
+        new NavItem { Id = "131", Href = "/expenses", IconName = IconName.List, Text = "عرض المصروفات", ParentId = "13" },
+        new NavItem { Id = "132", Href = "/expense", IconName = IconName.PersonPlus, Text = "إضافة مصروف", ParentId = "13" },
+
+        // كشف حساب معلم
+        new NavItem { Id = "14", IconName = IconName.Pencil, Text = "حسابات" },
+        new NavItem { Id = "141", Href = "/PaymentAnalysis", IconName = IconName.Pencil, Text = "كشف حساب ", ParentId = "14" },
+
+        // إضافة نسب السنتر علي الطلاب
+        new NavItem { Id = "15", IconName = IconName.Pencil, Text = "نسب السنتر" },
+        new NavItem { Id = "151", Href = "/centerrates", IconName = IconName.List, Text = "عرض نسب السنتر", ParentId = "15" },
+        new NavItem { Id = "152", Href = "/CenterRates/create", IconName = IconName.PersonPlus, Text = "اضافة نسبة للسنتر", ParentId = "15" },
+
+        // المستخدمين
+        new NavItem { Id = "16", IconName = IconName.Person, Text = "المستخدمين" },
+        new NavItem { Id = "161", Href = "/users", IconName = IconName.List, Text = "عرض المستخدمين", ParentId = "16" },
+        new NavItem { Id = "162", Href = "/add-user", IconName = IconName.PersonPlus, Text = "إضافة مستخدم", ParentId = "16" },
+
+        // الحساب
+        new NavItem { Id = "17", IconName = IconName.FileText, Text = "الحساب" },
+        new NavItem { Id = "171", Href = "/user-profile", IconName = IconName.List, Text = "عرض البروفايل", ParentId = "17" },
+        // المستأجرين
+        new NavItem { Id = "18", IconName = IconName.FileText, Text = "المستأجرين" },
+        new NavItem { Id = "181", Href = "/tenants", IconName = IconName.List, Text = "عرض المستأجرين", ParentId = "18" },
+        new NavItem { Id = "182", Href = "/tenant", IconName = IconName.List, Text = "إضافة مستأجر", ParentId = "18" },
+    };
+
+        return navItems;
+    }
+    private IEnumerable<NavItem> GetNavItems()
+    {
+        navItems = new List<NavItem>
+    {
+        // الرئيسية
+        new NavItem { Id = "1", Href = "/", IconName = IconName.HouseDoorFill, Text = "الرئيسية", Match = NavLinkMatch.All },
+
+        // الفروع
+        new NavItem { Id = "2", IconName = IconName.Building, Text = "الفروع",IconColor = IconColor.Success },
+        new NavItem { Id = "21", Href = "/branches", IconName = IconName.List, Text = "عرض الفروع", ParentId = "2" },
+        new NavItem { Id = "22", Href = "/branch", IconName = IconName.PersonPlus, Text = "إضافة فرع", ParentId = "2" },
+
+        // الصفوف
+        new NavItem { Id = "5", IconName = IconName.Grid, Text = "الصفوف" },
+        new NavItem { Id = "51", Href = "/grades", IconName = IconName.List, Text = "عرض الصفوف", ParentId = "5" },
+        new NavItem { Id = "52", Href = "/grade", IconName = IconName.PersonPlus, Text = "إضافة صف", ParentId = "5" },
+
+        // المواد
+        new NavItem { Id = "6", IconName = IconName.Book, Text = "المواد" },
+        new NavItem { Id = "61", Href = "/subjects", IconName = IconName.List, Text = "عرض المواد", ParentId = "6" },
+        new NavItem { Id = "62", Href = "/subject", IconName = IconName.PersonPlus, Text = "إضافة مادة", ParentId = "6" },
+
+        // المجموعات
+        new NavItem { Id = "7", IconName = IconName.PeopleFill, Text = "المجموعات" },
+        new NavItem { Id = "71", Href = "/groups", IconName = IconName.List, Text = "عرض المجموعات", ParentId = "7" },
+        new NavItem { Id = "72", Href = "/group", IconName = IconName.PersonPlus, Text = "إضافة مجموعة", ParentId = "7" },
+
+        // المدرسين
+        new NavItem { Id = "3", IconName = IconName.PersonCircle, Text = "المدرسين" },
+        new NavItem { Id = "31", Href = "/teachers", IconName = IconName.List, Text = "عرض المدرسين", ParentId = "3" },
+        new NavItem { Id = "32", Href = "/teacher", IconName = IconName.PersonPlus, Text = "إضافة مدرس", ParentId = "3" },
+
+        // الطلاب
+        new NavItem { Id = "4", IconName = IconName.People, Text = "الطلاب" },
+        new NavItem { Id = "41", Href = "/students", IconName = IconName.List, Text = "عرض الطلاب", ParentId = "4" },
+        new NavItem { Id = "42", Href = "/student", IconName = IconName.PersonPlus, Text = "إضافة طالب", ParentId = "4" },
+        new NavItem { Id = "43", Href = "/student-booking", IconName = IconName.PersonPlus, Text = "إضافة طالب مع الحجز", ParentId = "4" },
+
+        // جداول المجموعات
+        new NavItem { Id = "8", IconName = IconName.Calendar, Text = "جداول المجموعات" },
+        new NavItem { Id = "81", Href = "/groupschedules", IconName = IconName.List, Text = "عرض الجداول", ParentId = "8" },
+        new NavItem { Id = "82", Href = "/groupschedule", IconName = IconName.PersonPlus, Text = "إضافة جدول", ParentId = "8" },
+
+        // حجوزات الطلاب
+        new NavItem { Id = "9", IconName = IconName.CalendarCheck, Text = "حجوزات الطلاب" },
+        new NavItem { Id = "91", Href = "/Bookings", IconName = IconName.List, Text = "عرض الحجوزات", ParentId = "9" },
+        new NavItem { Id = "92", Href = "/Bookings/createoredit", IconName = IconName.PersonPlus, Text = "إضافة حجز", ParentId = "9" },
+
+        // مدفوعات الطلاب
+        new NavItem { Id = "10", IconName = IconName.CashStack, Text = "مدفوعات الطلاب" },
+        new NavItem { Id = "101", Href = "/Payments", IconName = IconName.List, Text = "عرض المدفوعات", ParentId = "10" },
+
+        // الحضور
+        new NavItem { Id = "11", IconName = IconName.Clock, Text = "الحضور" },
+        new NavItem { Id = "111", Href = "/attendances", IconName = IconName.List, Text = "تسجيل الحضور", ParentId = "11" },
+        new NavItem { Id = "115", Href = "/reportvattendances", IconName = IconName.Pencil, Text = "كشف حضور", ParentId = "11" },
+
+        // تسجيلات الحضور الملغية
+        new NavItem { Id = "12", IconName = IconName.Pencil, Text = "تسجيلات الحضور الملغية" },
+        new NavItem { Id = "121", Href = "/AttendanceCancellations", IconName = IconName.List, Text = "عرض تسجيلات الحضور الملغية", ParentId = "12" },
+
+        // المصروفات
+        new NavItem { Id = "13", IconName = IconName.Pencil, Text = "المصروفات" },
+        new NavItem { Id = "131", Href = "/expenses", IconName = IconName.List, Text = "عرض المصروفات", ParentId = "13" },
+        new NavItem { Id = "132", Href = "/expense", IconName = IconName.PersonPlus, Text = "إضافة مصروف", ParentId = "13" },
+
+        // كشف حساب معلم
+        new NavItem { Id = "14", IconName = IconName.Pencil, Text = "حسابات" },
+        new NavItem { Id = "141", Href = "/PaymentAnalysis", IconName = IconName.Pencil, Text = "كشف حساب ", ParentId = "14" },
+
+        // إضافة نسب السنتر علي الطلاب
+        new NavItem { Id = "15", IconName = IconName.Pencil, Text = "نسب السنتر" },
+        new NavItem { Id = "151", Href = "/centerrates", IconName = IconName.List, Text = "عرض نسب السنتر", ParentId = "15" },
+        new NavItem { Id = "152", Href = "/CenterRates/create", IconName = IconName.PersonPlus, Text = "اضافة نسبة للسنتر", ParentId = "15" },
+
+        // المستخدمين
+        new NavItem { Id = "16", IconName = IconName.Person, Text = "المستخدمين" },
+        new NavItem { Id = "161", Href = "/users", IconName = IconName.List, Text = "عرض المستخدمين", ParentId = "16" },
+        new NavItem { Id = "162", Href = "/add-user", IconName = IconName.PersonPlus, Text = "إضافة مستخدم", ParentId = "16" },
+
+        // الحساب
+        new NavItem { Id = "17", IconName = IconName.FileText, Text = "الحساب" },
+        new NavItem { Id = "171", Href = "/user-profile", IconName = IconName.List, Text = "عرض البروفايل", ParentId = "17" },
+
+    };
+
+        return navItems;
+    }
+
+
+
+    private IEnumerable<NavItem> GetNavItems2()
+    {
+        var navItems = new List<NavItem>
+    {
+        // الرئيسية
+        new NavItem { Id = "1", Href = "/", IconName = IconName.HouseDoorFill, Text = "الرئيسية", Match = NavLinkMatch.All },
+
+        // الطلاب
+        new NavItem { Id = "4", IconName = IconName.People, Text = "الطلاب" },
+        new NavItem { Id = "41", Href = "/students", IconName = IconName.List, Text = "عرض الطلاب", ParentId = "4" },
+        new NavItem { Id = "42", Href = "/student", IconName = IconName.PersonPlus, Text = "إضافة طالب", ParentId = "4" },
+
+        // المجموعات
+        new NavItem { Id = "7", IconName = IconName.PeopleFill, Text = "المجموعات" },
+        new NavItem { Id = "71", Href = "/groups", IconName = IconName.List, Text = "عرض المجموعات", ParentId = "7" },
+        new NavItem { Id = "72", Href = "/group", IconName = IconName.PersonPlus, Text = "إضافة مجموعة", ParentId = "7" },
+
+        // جداول المجموعات
+        new NavItem { Id = "8", IconName = IconName.Calendar, Text = "جداول المجموعات" },
+        new NavItem { Id = "81", Href = "/groupschedules", IconName = IconName.List, Text = "عرض الجداول", ParentId = "8" },
+        new NavItem { Id = "82", Href = "/groupschedule", IconName = IconName.PersonPlus, Text = "إضافة جدول", ParentId = "8" },
+
+        // حجوزات الطلاب
+        new NavItem { Id = "9", IconName = IconName.CalendarCheck, Text = "حجوزات الطلاب" },
+        new NavItem { Id = "91", Href = "/Bookings", IconName = IconName.List, Text = "عرض الحجوزات", ParentId = "9" },
+        new NavItem { Id = "92", Href = "/Bookings/createoredit", IconName = IconName.PersonPlus, Text = "إضافة حجز", ParentId = "9" },
+                new NavItem { Id = "93", Href = "/student-booking", IconName = IconName.PersonPlus, Text = "إضافة طالب مع الحجز", ParentId = "4" },
+
+        // الحضور
+        new NavItem { Id = "11", IconName = IconName.Clock, Text = "الحضور" },
+        new NavItem { Id = "111", Href = "/attendances", IconName = IconName.List, Text = "تسجيل الحضور", ParentId = "11" },
+        new NavItem { Id = "115", Href = "/reportvattendances", IconName = IconName.Pencil, Text = "كشف حضور" , ParentId = "11" },
+
+        // كشف حساب معلم
+        new NavItem { Id = "14", IconName = IconName.Pencil, Text = "حسابات" },
+        new NavItem { Id = "141", Href = "/PaymentAnalysis", IconName = IconName.Pencil, Text = "كشف حساب ", ParentId = "14" },
+
+        // الحساب
+        new NavItem { Id = "17", IconName = IconName.FileText, Text = "الحساب" },
+        new NavItem { Id = "171", Href = "/user-profile", IconName = IconName.List, Text = "عرض البروفايل", ParentId = "17" },};
+        return navItems;
+    }
+
+
+    private async Task Logout()
+    {
+        await AccountManagement.LogoutAsync();
+        Navigation.NavigateTo("/login");
+    }
+}

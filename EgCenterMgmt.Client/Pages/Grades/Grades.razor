@@ -1,0 +1,145 @@
+﻿@page "/grades"
+@using AutoMapper
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>إدارة الصفوف</PageTitle>
+
+<h3>الصفوف</h3>
+
+<Button Color="ButtonColor.Success" Class="mb-3" @onclick="CreateGrade">إضافة صف جديد</Button>
+
+@if (grades == null)
+{
+    <p><em>إنتظار...</em></p>
+}
+else
+{
+    <Modal @ref="modal" Title="تأكيد حذف الصف">
+        <BodyTemplate>
+            <h5>هل تريد حذف الصف <h1>"@GradeName"</h1></h5>
+            <h5>ستقوم بحذف كل البيانات المرتبطة بهذا الصف.</h5>
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="OnHideModalClick">رجوع</Button>
+            <Button Color="ButtonColor.Danger" @onclick="() => DeleteGrade(GradeId)">حذف</Button>
+        </FooterTemplate>
+    </Modal>
+
+    <Grid TItem="GradeDto"
+          DataProvider="GradesDataProvider"
+          AllowFiltering="true"
+          AllowSorting="true"
+          Class="table-hover table"
+          FiltersRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-25"
+          HeaderRowCssClass="bg-primary text-white border-bottom-0"
+          PageSize="150"
+          AllowPaging="true"
+          Responsive="true">
+        <GridColumns>
+            <GridColumn TItem="GradeDto" HeaderText="كود الصف" PropertyName="GradeId" SortKeySelector="item => item.GradeId">
+                @context.GradeId
+            </GridColumn>
+            <GridColumn TItem="GradeDto" HeaderText="اسم الصف" PropertyName="GradeName" SortKeySelector="item => item.GradeName">
+                @context.GradeName
+            </GridColumn>
+            <GridColumn TItem="GradeDto" HeaderText="تعديل" PropertyName="Operations">
+                <Button Color="ButtonColor.Primary" @onclick="() => EditGrade(context.GradeId)">تعديل</Button>
+            </GridColumn>
+            <GridColumn TItem="GradeDto" HeaderText="حذف" PropertyName="Operations">
+                <Button Color="ButtonColor.Danger" @onclick="()=>OnShowModalClick(context)">حذف</Button>
+            </GridColumn>
+        </GridColumns>
+
+    </Grid>
+}
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    private Modal modal = default!;
+    private List<GradeDto>? grades;
+    private List<ToastMessage> messages = new();
+    private int gradeIdToDelete;
+
+    private async Task<GridDataProviderResult<GradeDto>> GradesDataProvider(GridDataProviderRequest<GradeDto> request)
+    {
+        if (grades == null)
+            grades = await Http.GetFromJsonAsync<List<GradeDto>>("api/Grade/GetGrades");
+
+        IEnumerable<GradeDto> dataToApply = grades ?? Enumerable.Empty<GradeDto>();
+        return request.ApplyTo(dataToApply);
+    }
+
+    public int GradeId;
+    public string? GradeName;
+
+    private async Task OnShowModalClick(GradeDto grade)
+    {
+        GradeId = grade.GradeId;
+        GradeName = grade.GradeName;
+        await modal.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+        GradeId = 0;
+        GradeName = null;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        grades = await Http.GetFromJsonAsync<List<GradeDto>>("api/Grade/GetGrades");
+    }
+
+    private void EditGrade(int id)
+    {
+        Navigation.NavigateTo($"/grade/{id}");
+    }
+
+    private async void ConfirmDelete()
+    {
+        await DeleteGrade(gradeIdToDelete);
+    }
+
+    private async Task DeleteGrade(int id)
+    {
+        var response = await Http.DeleteAsync($"api/Grade/DeleteGrade/{id}");
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم حذف الصف بنجاح.");
+            grades = await Http.GetFromJsonAsync<List<GradeDto>>("api/Grade/GetGrades");
+        }
+        else
+        {
+            string errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشل في حذف الصف. الخطأ: {errorMessage}");
+        }
+        await OnHideModalClick();
+        await OnInitializedAsync();
+    }
+
+    private void CreateGrade()
+    {
+        Navigation.NavigateTo("/grade");
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(CreateToastMessage(toastType, message));
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    {
+        return new ToastMessage
+            {
+                Type = toastType,
+                Title = "عملية الحذف",
+                HelpText = $"{DateTime.Now}",
+                Message = message,
+            };
+    }
+}

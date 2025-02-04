@@ -1,0 +1,80 @@
+﻿@page "/CenterRates/create"
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<h3>إنشاء نسبة جديدة</h3>
+
+<div class="card">
+    <div class="card-body">
+        <EditForm Model="rate" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="form-group mb-3">
+                <label for="rateSession">نسبة الحصة للسنتر</label>
+                <InputNumber id="rateSession" @bind-Value="rate.RateSession" class="form-control" />
+                <ValidationMessage For="@(() => rate.RateSession)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="rateMonthly">نسبة الشهر للسنتر</label>
+                <InputNumber id="rateMonthly" @bind-Value="rate.RateMonthly" class="form-control" />
+                <ValidationMessage For="@(() => rate.RateMonthly)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="rate">الشهر المحسوب عليه</label>
+                <InputNumber id="rate" @bind-Value="rate.Rate" class="form-control" />
+                <ValidationMessage For="@(() => rate.Rate)" />
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <Button Color="ButtonColor.Success" @onclick="HandleValidSubmit">إضافة</Button>
+                <Button Color="ButtonColor.Danger" @onclick="Cancel">إلغاء</Button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    private CenterRate rate = new CenterRate();
+    private List<ToastMessage> messages = new();
+
+    private async Task HandleValidSubmit()
+    {
+        var response = await Http.PostAsJsonAsync("api/CenterRate/CreateRate", rate);
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم إضافة المعدل بنجاح.");
+            NavigationManager.NavigateTo("/centerrates"); // توجيه إلى صفحة المعدلات بعد الإضافة الناجحة
+        }
+        else
+        {
+            string errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشلت العملية. الخطأ: {errorMessage}");
+        }
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo("/centerrates");
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(CreateToastMessage(toastType, message));
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    {
+        return new ToastMessage
+            {
+                Type = toastType,
+                Title = "عملية النسبة",
+                HelpText = $"{DateTime.Now}",
+                Message = message,
+            };
+    }
+}

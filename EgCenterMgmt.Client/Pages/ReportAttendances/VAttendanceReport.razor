@@ -1,0 +1,178 @@
+﻿@attribute [Authorize(Roles = "Admin, Assistant")]
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IMapper _mapper
+@inject IToastService toastService
+
+<style>
+.my-custom-table {
+    border-radius: 10px; /* تعيين حواف مستديرة */
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* إضافة ظل */
+    /* أي تخصيصات أخرى تحتاجها */
+}
+</style>
+<PageTitle>إدارة الحضور</PageTitle>
+<Toasts class="p-3" Messages="messages" AutoHide="true" Delay="6000" Placement="ToastsPlacement.TopRight" />
+
+@if (AttendancesList == null)
+{
+    <p><em>جار التحميل...</em></p>
+}
+else
+{
+    <Grid TItem="Totalattendance"
+          DataProvider="AttendancesListDataProvider"
+          AllowFiltering="true"
+          AllowSorting="true"
+          class="table-hover table-bordered table-striped my-custom-table table"
+          FiltersRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-25"
+          HeaderRowCssClass="bg-primary text-white border-bottom-0"
+          PageSize="150"
+          AllowPaging="true"
+          Responsive="true">
+        <GridColumns>
+            <GridColumn TItem="Totalattendance" HeaderText="كود الطالب" PropertyName="StudentCode">
+                @context.StudentCode
+            </GridColumn>
+            <GridColumn TItem="Totalattendance" HeaderText="اسم الطالب" PropertyName="StudentName">
+                @context.StudentName
+            </GridColumn>
+            <GridColumn TItem="Totalattendance" HeaderText="اسم المجموعة" PropertyName="GroupName">
+                @context.GroupName
+            </GridColumn>
+            <GridColumn TItem="Totalattendance" HeaderText="اسم المعلم" PropertyName="TeacherName">
+                @context.TeacherName
+            </GridColumn>
+            <GridColumn TItem="Totalattendance" HeaderText="إجمالي الحضور" PropertyName="TotalAttendance">
+                @context.TotalAttendance
+            </GridColumn>
+            <GridColumn TItem="Totalattendance" HeaderText="إجمالي الغياب" PropertyName="TotalAbsence">
+                @context.TotalAbsence
+            </GridColumn>
+            <GridColumn TItem="Totalattendance" HeaderText="أيام الحضور" PropertyName="AttendanceDates">
+                @context.AttendanceDates
+            </GridColumn>
+            <GridColumn TItem="Totalattendance" HeaderText="أيام الغياب" PropertyName="AbsenceDates">
+                @context.AbsenceDates
+            </GridColumn>
+            <GridColumn TItem="Totalattendance" HeaderText="المبلغ الإجمالي المدفوع" PropertyName="TotalAmount">
+                @context.TotalAmount
+            </GridColumn>
+            <GridColumn TItem="Totalattendance" HeaderText="الرصيد المتبقي" PropertyName="TotalBalance">
+                @context.TotalBalance
+            </GridColumn>
+            <GridColumn TItem="Totalattendance" HeaderText="حالة الالتزام">
+                @{
+                    var status = context.IStatus ? "مرفود" : "ملتزم";
+                    var buttonClass = context.IStatus ? "btn btn-danger" : "btn btn-success";
+                }
+                <button class="@buttonClass">
+                    @status
+                </button>
+            </GridColumn>
+            <GridColumn TItem="Totalattendance" HeaderText="رقم هاتف الطالب" PropertyName="StudentPhone">
+                @context.StudentPhone
+            </GridColumn>
+            <GridColumn TItem="Totalattendance" HeaderText="رقم واتساب الأب" PropertyName="FatherWhatsApp">
+                @context.FatherWhatsApp
+            </GridColumn>
+        </GridColumns>
+    </Grid>
+
+
+}
+
+@code {
+    [Parameter] public int? StudentId { get; set; }
+    [Parameter] public int? GroupId { get; set; }
+    [Parameter] public int? TeacherId { get; set; }
+
+    [Parameter] public DateOnly? FromDate { get; set; }
+    [Parameter] public DateOnly? ToDate { get; set; }
+
+    private List<Totalattendance>? AttendancesList;
+    List<ToastMessage> messages = new List<ToastMessage>();
+    private string? Message;
+    private Modal renewModal = default!;
+    private int selectedAttendanceId;
+    private string selectedRenewalType = string.Empty;
+    private string Session = "حصة";
+    private string Month = "شهري";
+    private Totalattendance? context;
+    private PaymentDto? PaymentDto;
+
+    public int AttendanceId;
+
+    private void ShowMessage(ToastType toastType) => messages.Add(CreateToastMessage(toastType));
+
+    private ToastMessage CreateToastMessage(ToastType toastType)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "عملية تسجيل حضور",
+            HelpText = $"{DateTime.Now}",
+            Message = Message,
+        };
+    private async Task<GridDataProviderResult<Totalattendance>> AttendancesListDataProvider(GridDataProviderRequest<Totalattendance> request)
+    {
+        if (AttendancesList == null)
+        {            await LoadAttendancesList();
+        }
+        IEnumerable<Totalattendance> dataToApply = AttendancesList ?? Enumerable.Empty<Totalattendance>();
+        return request.ApplyTo(dataToApply);
+    }
+
+    private void OnShowModalClick(Vattendance attendance)
+    {
+        AttendanceId = attendance.AttendanceId;
+    }
+
+    private void OnHideModalClick()
+    {
+        AttendanceId = 0;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAttendancesList();
+        FromDate = FromDate = DateOnly.FromDateTime(DateTime.Now);
+
+    }
+
+    private async Task LoadAttendancesList()
+    {
+        try
+        {
+            string url = "api/Attendance/vreportvattendances";
+
+            if (StudentId.HasValue)
+            {
+                url = $"api/Attendance/reportAttendancesstudent?studentid={StudentId.Value}";
+            }
+            else if (GroupId.HasValue)
+            {
+                url = $"api/Attendance/reportAttendancesgroup?groupid={GroupId.Value}";
+            }
+            else if (TeacherId.HasValue)
+            {
+                url = $"api/Attendance/reportAttendancetech?techid={TeacherId.Value}";
+            }
+
+            if (FromDate.HasValue)
+            {
+                url += $"&fromDate={FromDate.Value.ToString("yyyy-MM-dd")}";
+            }
+            if (ToDate.HasValue)
+            {
+                url += $"&toDate={ToDate.Value.ToString("yyyy-MM-dd")}";
+            }
+
+            AttendancesList = await Http.GetFromJsonAsync<List<Totalattendance>>(url);
+        }
+        catch (Exception ex)
+        {
+            Message = $"فشل في تحميل كشف الحضور. الخطأ: {ex.Message} : {DateTime.Now}";
+            ShowMessage(ToastType.Danger);
+        }
+    }
+}

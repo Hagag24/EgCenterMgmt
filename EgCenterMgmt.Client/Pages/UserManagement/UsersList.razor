@@ -1,0 +1,91 @@
+﻿@page "/users"
+@using EgCenterMgmt.Shared.ModelsAuth
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IToastService ToastService
+@attribute [Authorize(Roles = "Admin")]
+
+<h3>قائمة المستخدمين</h3>
+
+<Button Color="ButtonColor.Success" @onclick="AddUser">إضافة مستخدم</Button>
+
+<Grid TItem="UserDto"
+      Class="table table-hover table-bordered table-striped"
+      DataProvider="UsersDataProvider"
+      AllowFiltering="true"
+      AllowPaging="true"
+      AllowSorting="true"
+      Responsive="true">
+
+    <GridColumn TItem="UserDto" HeaderText="اسم المستخدم" PropertyName="UserName" SortString="UserName" SortKeySelector="item => item.UserName">
+        @context.UserName
+    </GridColumn>
+    <GridColumn TItem="UserDto" HeaderText="البريد الإلكتروني" PropertyName="Email" SortString="Email" SortKeySelector="item => item.Email">
+        @context.Email
+    </GridColumn>
+    <GridColumn TItem="UserDto" HeaderText="الصلاحيات" PropertyName="Roles" SortString="Roles" SortKeySelector="item => string.Join(',', item.Roles!)">
+        @string.Join(", ", @context.Roles!)
+    </GridColumn>
+
+    <GridColumn TItem="UserDto" HeaderText="تعديل صلاحية المستخدم">
+        <Button Color="ButtonColor.Primary" @onclick="() => EditRole(context.UserId!)">تعديل</Button>
+    </GridColumn>
+    <GridColumn TItem="UserDto" HeaderText="تغيير كلمة مرور المستخدم">
+        <Button Color="ButtonColor.Danger" @onclick="() => ResetPassword(context.UserId!)">تغيير كلمة المرور</Button>
+    </GridColumn>
+</Grid>
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    private List<UserDto>? users;
+    private List<ToastMessage> messages = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            users = await Http.GetFromJsonAsync<List<UserDto>>("api/UserManagement/GetUsers");
+        }
+        catch (Exception ex)
+        {
+            ShowMessage(ToastType.Danger, $"فشل في تحميل بيانات المستخدمين : {ex.Message.ToString()}");
+        }
+    }
+
+    private void AddUser()
+    {
+        NavigationManager.NavigateTo($"/add-user");
+    }
+
+    private void EditRole(string userId)
+    {
+        NavigationManager.NavigateTo($"/edit-role/{userId}");
+    }
+
+    private void ResetPassword(string userId)
+    {
+        NavigationManager.NavigateTo($"/reset-password/{userId}");
+    }
+
+    private async Task<GridDataProviderResult<UserDto>> UsersDataProvider(GridDataProviderRequest<UserDto> request)
+    {
+        if (users == null)
+            users = await Http.GetFromJsonAsync<List<UserDto>>("api/UserManagement/GetUsers");
+        return await Task.FromResult(request.ApplyTo(users!));
+    }
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(new ToastMessage
+            {
+                Type = toastType,
+                Title = "تنبيه",
+                Message = message,
+                HelpText = $"{DateTime.Now}"
+            });
+    }
+}

@@ -1,0 +1,136 @@
+﻿@page "/student"
+@page "/student/{id:int}"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin, Assistant")]
+
+<PageTitle>@(id.HasValue ? "تعديل الطالب" : "إنشاء طالب جديد")</PageTitle>
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">@("تعديل الطالب")</h5>
+        </div>
+        <div class="card-body">
+            @if (studentDto == null || grades == null)
+            {
+                <p><em>جار التحميل...</em></p>
+            }
+            else
+            {
+                <EditForm Model="studentDto" OnValidSubmit="HandleValidSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-3">
+                        <label for="studentName" class="form-label">اسم الطالب</label>
+                        <InputText id="studentName" class="form-control" @bind-Value="studentDto.StudentName" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="gradeId" class="form-label">الصف الدراسي</label>
+                        <select id="gradeId" class="form-select" @bind="studentDto.GradeId">
+                            <option value="">اختر الصف</option>
+                            @foreach (var grade in grades)
+                            {
+                                <option value="@grade.GradeId">@grade.GradeName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="gender" class="form-label">النوع</label>
+                        <Switch id="gender" @bind-Value="studentDto.IsMaile" Label="ذكر / أنثى" Reverse="true" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="studentEmail" class="form-label">البريد الإلكتروني</label>
+                        <InputText id="studentEmail" class="form-control" @bind-Value="studentDto.StudentEmail" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="studentPhone" class="form-label">رقم الهاتف</label>
+                        <InputText id="studentPhone" class="form-control" @bind-Value="studentDto.StudentPhone" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="studentWhatsApp" class="form-label">واتساب الطالب</label>
+                        <InputText id="studentWhatsApp" class="form-control" @bind-Value="studentDto.StudentWhatsApp" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="fatherWhatsApp" class="form-label">واتساب الأب</label>
+                        <InputText id="fatherWhatsApp" class="form-control" @bind-Value="studentDto.FatherWhatsApp" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="county" class="form-label">البلد</label>
+                        <InputText id="county" class="form-control" @bind-Value="studentDto.Country" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="studentStatus" class="form-label">حالة الطالب</label>
+                        <Switch id="studentStatus" @bind-Value="studentDto.IStatus" Label="مرفوض / ملتزم" Reverse="true" />
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <Button Color="ButtonColor.Success" @onclick="HandleValidSubmit">@((id.HasValue ? "تحديث" : "إنشاء"))</Button>
+                        <Button Color="ButtonColor.Danger" @onclick="Cancel">إلغاء</Button>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+
+    <Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+</div>
+
+@code {
+    [Parameter] public int? id { get; set; }
+    private StudentDto? studentDto = new StudentDto();
+    private List<GradeDto>? grades;
+    private List<ToastMessage> messages = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (id.HasValue)
+        {
+            studentDto = await Http.GetFromJsonAsync<StudentDto>($"api/Student/GetStudent?id={id}");
+        }
+
+        grades = await Http.GetFromJsonAsync<List<GradeDto>>("api/Grade/GetGrades");
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        HttpResponseMessage response;
+
+        if (id.HasValue)
+        {
+            response = await Http.PutAsJsonAsync($"api/Student/PutStudent", studentDto);
+        }
+        else
+        {
+            response = await Http.PostAsJsonAsync("api/Student/PostStudent", studentDto);
+        }
+
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم حفظ بيانات الطالب بنجاح.");
+            Navigation.NavigateTo("/students");
+        }
+        else
+        {
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشل في حفظ بيانات الطالب. الخطأ: {errorMessage}");
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/students");
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(new ToastMessage
+            {
+                Type = toastType,
+                Title = "تنبيه",
+                Message = message,
+                HelpText = $"{DateTime.Now}"
+            });
+    }
+}

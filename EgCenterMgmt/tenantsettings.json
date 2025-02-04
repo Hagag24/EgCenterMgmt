@@ -1,0 +1,60 @@
+{
+  "TenantSettings": {
+    "Defaults": {
+      "DBProvider": "mssql",
+      "ConnectionString": "Server=DESKTOP-F2HTAHQ\\SQLEXPRESS;Database=8734_Default-EgCenter_Mgmt;Integrated Security=True;TrustServerCertificate=True;MultipleActiveResultSets=True;"
+    },
+    "Tenants": [
+      {
+        "Name": "Default",
+        "TId": "Default",
+        "IsActive": "True",
+        "StartDate": "2024/11/18",
+        "EndDate": "2025/11/18"
+      },
+      {
+        "Name": "SmartAcademy",
+        "TId": "Smart@=Academy",
+        "IsActive": "True",
+        "StartDate": "2024/11/18",
+        "EndDate": "2025/11/18",
+        "ConnectionString": "Server=DESKTOP-F2HTAHQ\\SQLEXPRESS;Database=8734_SmartAcademy-EgCenterMgmt;Integrated Security=True;TrustServerCertificate=True;MultipleActiveResultSets=True;"
+      },
+      {
+        "Name": "ALEABAQIRA",
+        "TId": "@ALEABAQIRA=",
+        "IsActive": "True",
+        "StartDate": "2024/11/18",
+        "EndDate": "2025/11/18",
+        "ConnectionString": "Server=DESKTOP-F2HTAHQ\\SQLEXPRESS;Database=ALEABAQIRA-EgCenterMgmt;Integrated Security=True;TrustServerCertificate=True;MultipleActiveResultSets=True;"
+      }
+    ]
+  }
+}
+
+//{
+//  "TenantSettings": {
+//    "Defaults": {
+//      "DBProvider": "mssql",
+//      "ConnectionString": "Server=db13232.databaseasp.net; Database=db13232; User Id=db13232; Password=zH+9?y4PE8@c; Encrypt=False; MultipleActiveResultSets=True;"
+//    },
+//    "Tenants": [
+//      {
+//        "Name": "Default",
+//        "TId": "Default",
+//        "IsActive": "True",
+//        "StartDate": "2024/11/18",
+//        "EndDate": "2025/11/18"
+//      },
+//      {
+//        "Name": "ALEABAQIRA",
+//        "TId": "@ALEABAQIRA=",
+//        "IsActive": "True",
+//        "StartDate": "2024/11/18",
+//        "EndDate": "2025/11/18",
+//        "ConnectionString": "Server=db13231.databaseasp.net; Database=db13231; User Id=db13231; Password=Sy3?m%L87Bt#; Encrypt=False; MultipleActiveResultSets=True;"
+//      }
+
+//    ]
+//  }
+//}

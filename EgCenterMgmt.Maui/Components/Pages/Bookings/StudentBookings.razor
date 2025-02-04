@@ -1,0 +1,86 @@
+﻿@page "/Bookings"
+
+@attribute [Authorize(Roles = "Admin, Assistant")]
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<main class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title">بحث عن الحجوزات</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="groupId" class="form-label">إسم المجموعة</label>
+                        <input id="groupId" class="form-control" @oninput="FilterGroups" placeholder="ابحث عن المجموعة ...." @onclick="() => isGroupDropdownOpen = true" />
+                        <select id="groupDropdown" class="form-select mt-2" style="display:@GetDropdownDisplay(isGroupDropdownOpen)" @bind="selectedGroupId">
+                            <option value="">اختر المجموعة</option>
+                            @if (filteredGroups != null)
+                            {
+                                @foreach (var group in filteredGroups)
+                                {
+                                    <option value="@group.GroupId">@group.GroupName</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <Button Color="ButtonColor.Success" class="w-100 mt-3" @onclick="LoadAttendances">عرض الحجوزات</Button>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+@code {
+    private IEnumerable<GroupDto>? groups;
+
+    private bool isGroupDropdownOpen = false;
+    private List<GroupDto>? filteredGroups;
+
+    private int? selectedGroupId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            groups = await Http.GetFromJsonAsync<IEnumerable<GroupDto>>("api/Group/GetGroups");
+            filteredGroups = groups?.ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private void FilterGroups(ChangeEventArgs e)
+    {
+        string filterValue = e.Value?.ToString()?.ToLower() ?? string.Empty;
+        filteredGroups = string.IsNullOrWhiteSpace(filterValue)
+            ? groups?.ToList()
+            : groups?.Where(g => g.GroupName!.ToLower().Contains(filterValue)).ToList();
+        isGroupDropdownOpen = true;
+
+        StateHasChanged();
+    }
+
+    private string GetDropdownDisplay(bool isOpen)
+    {
+        return isOpen ? "block" : "none";
+    }
+
+    private void LoadAttendances()
+    {
+        string url;
+        if (selectedGroupId.HasValue)
+        {
+            url = $"/VBookings/group/{selectedGroupId}";
+        }
+        else
+        {
+            url = "/VBookings";
+        }
+        Navigation.NavigateTo(url);
+    }
+}

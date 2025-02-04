@@ -1,0 +1,206 @@
+﻿@page "/group"
+@page "/group/{id:int}"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin, Assistant")]
+
+<PageTitle>@(id.HasValue ? "تعديل المجموعة" : "إنشاء مجموعة جديدة")</PageTitle>
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header text-center">
+            <h3>@(id.HasValue ? "تعديل المجموعة" : "إنشاء مجموعة جديدة")</h3>
+        </div>
+        <div class="card-body">
+            @if (groupDto == null)
+            {
+                <p><em>جار التحميل...</em></p>
+            }
+            else
+            {
+                <EditForm Model="groupDto" OnValidSubmit="HandleValidSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-3 row">
+                        <label for="groupName" class="col-sm-3 col-form-label">اسم المجموعة</label>
+                        <div class="col-sm-9">
+                            <InputText id="groupName" class="form-control" @bind-Value="groupDto.GroupName" />
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="branchId" class="col-sm-3 col-form-label">الفرع</label>
+                        <div class="col-sm-9">
+                            <select id="branchId" class="form-control" @bind="groupDto.BranchId">
+                                <option value="">اختر الفرع</option>
+                                @if (branches is not null)
+                                {
+                                    @foreach (var branch in branches)
+                                    {
+                                        <option value="@branch.BranchId">@branch.BranchName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="gradeId" class="col-sm-3 col-form-label">الصف</label>
+                        <div class="col-sm-9">
+                            <select id="gradeId" class="form-control" @bind="groupDto.GradeId">
+                                <option value="">اختر الصف</option>
+                                @if (grades is not null)
+                                {
+                                    @foreach (var grade in grades)
+                                    {
+                                        <option value="@grade.GradeId">@grade.GradeName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="subjectId" class="col-sm-3 col-form-label">المادة</label>
+                        <div class="col-sm-9">
+                            <select id="subjectId" class="form-control" @bind="groupDto.SubjectId">
+                                <option value="">اختر المادة</option>
+                                @if (subjects is not null)
+                                {
+                                    @foreach (var subject in subjects)
+                                    {
+                                        <option value="@subject.SubjectId">@subject.SubjectName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="teacherId" class="col-sm-3 col-form-label">المدرس</label>
+                        <div class="col-sm-9">
+                            <select id="teacherId" class="form-control" @bind="groupDto.TeacherId">
+                                <option value="">اختر المدرس</option>
+                                @if (teachers is not null)
+                                {
+                                    @foreach (var teacher in teachers)
+                                    {
+                                        <option value="@teacher.TeacherId">@teacher.TeacherName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="startDate" class="col-sm-3 col-form-label">تاريخ البدء</label>
+                        <div class="col-sm-9">
+                            <InputDate id="startDate" class="form-control" @bind-Value="groupDto.StartDate" />
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="maxlenth" class="col-sm-3 col-form-label">أقصى عدد طلاب للمجموعة</label>
+                        <div class="col-sm-9">
+                            <InputNumber id="maxlenth" class="form-control" @bind-Value="groupDto.MaxLenth" />
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="servingPrice" class="col-sm-3 col-form-label">سعر الحصة</label>
+                        <div class="col-sm-9">
+                            <InputNumber id="servingPrice" class="form-control" @bind-Value="groupDto.ServingPrice" />
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="pricepermonth" class="col-sm-3 col-form-label">السعر شهرياً</label>
+                        <div class="col-sm-9">
+                            <InputNumber id="pricepermonth" class="form-control" @bind-Value="groupDto.Pricepermonth" />
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="numberDayeSattendees" class="col-sm-3 col-form-label">عدد أيام الحضور في الشهر</label>
+                        <div class="col-sm-9">
+                            <InputNumber id="numberDayeSattendees" class="form-control" @bind-Value="groupDto.NumberDayeSattendees" />
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <div class="d-flex justify-content-between">
+                            <Button Color="ButtonColor.Success" @onclick="HandleValidSubmit">@((id.HasValue ? "تحديث" : "إنشاء"))</Button>
+                            <Button Color="ButtonColor.Danger" @onclick="Cancel">إلغاء</Button>
+                        </div>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+</div>
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    [Parameter] public int? id { get; set; }
+    private GroupDto? groupDto = new GroupDto();
+    private List<BranchDto>? branches = new();
+    private List<GradeDto>? grades = new();
+    private List<SubjectDto>? subjects = new();
+    private List<TeacherDto>? teachers = new();
+    private List<ToastMessage> messages = new();
+    private Modal modal = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (id.HasValue)
+        {
+            groupDto = await Http.GetFromJsonAsync<GroupDto>($"api/Group/GetGroup?id={id}");
+        }
+        branches = await Http.GetFromJsonAsync<List<BranchDto>>("api/Branch/GetBranches");
+        grades = await Http.GetFromJsonAsync<List<GradeDto>>("api/Grade/GetGrades");
+        subjects = await Http.GetFromJsonAsync<List<SubjectDto>>("api/Subject/GetSubjects");
+        teachers = await Http.GetFromJsonAsync<List<TeacherDto>>("api/Teacher/GetTeachers");
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        HttpResponseMessage response;
+        if (id.HasValue)
+        {
+            response = await Http.PutAsJsonAsync($"api/Group/PutGroup?id={id}", groupDto);
+        }
+        else
+        {
+            response = await Http.PostAsJsonAsync("api/Group/PostGroup", groupDto);
+        }
+
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم حفظ البيانات بنجاح.");
+            Navigation.NavigateTo("/groups");
+        }
+        else
+        {
+            string errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشل في حفظ البيانات. الخطأ: {errorMessage}");
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/groups");
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(CreateToastMessage(toastType, message));
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    {
+        return new ToastMessage
+            {
+                Type = toastType,
+                Title = "عمليات إدارة المجموعات",
+                HelpText = $"{DateTime.Now}",
+                Message = message,
+            };
+    }
+}

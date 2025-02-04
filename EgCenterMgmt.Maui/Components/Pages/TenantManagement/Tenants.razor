@@ -1,0 +1,141 @@
+﻿@page "/tenants"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@attribute [Authorize(Roles = "SuperAdmin")]
+
+<PageTitle>إدارة المستأجرين</PageTitle>
+
+<h3>المستأجرين</h3>
+
+<Button Color="ButtonColor.Success" Class="mb-3" @onclick="CreateTenant">إضافة مستأجر جديد</Button>
+
+@if (tenants == null)
+{
+    <p><em>جار التحميل...</em></p>
+}
+else
+{
+    <Modal @ref="modal" Title="تأكيد حذف المستأجر">
+        <BodyTemplate>
+            <h5>هل تريد حذف المستأجر <h1>"@TenantName"</h1></h5>
+            <h5>ستقوم بحذف كل البيانات المرتبطة بهذا المستأجر.</h5>
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="OnHideModalClick">رجوع</Button>
+            <Button Color="ButtonColor.Danger" @onclick="() => DeleteTenant(TenantId!)">حذف</Button>
+        </FooterTemplate>
+    </Modal>
+
+    <Grid TItem="Tenant"
+          DataProvider="TenantsDataProvider"
+          AllowFiltering="true"
+          AllowSorting="true"
+          Class="table-hover table"
+          FiltersRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-25"
+          HeaderRowCssClass="bg-primary text-white border-bottom-0"
+          PageSize="150"
+          AllowPaging="true"
+          Responsive="true">
+        <GridColumns>
+            <GridColumn TItem="Tenant" HeaderText="كود المستأجر" PropertyName="TId" SortKeySelector="item => item.TId">
+                @context.TId
+            </GridColumn>
+            <GridColumn TItem="Tenant" HeaderText="اسم المستأجر" PropertyName="Name" SortKeySelector="item => item.Name">
+                @context.Name
+            </GridColumn>
+            <GridColumn TItem="Tenant" HeaderText="الحالة" PropertyName="IsActive" SortKeySelector="item => item.IsActive">
+                @context.IsActive
+            </GridColumn>
+            <GridColumn TItem="Tenant" HeaderText="تاريخ البدء" PropertyName="StartDate" SortKeySelector="item => item.StartDate">
+                @context.StartDate
+            </GridColumn>
+            <GridColumn TItem="Tenant" HeaderText="تاريخ الانتهاء" PropertyName="EndDate" SortKeySelector="item => item.EndDate">
+                @context.EndDate
+            </GridColumn>
+            <GridColumn TItem="Tenant" HeaderText="عمليات" PropertyName="Operations">
+                <Button Color="ButtonColor.Primary" @onclick="() => EditTenant(context.TId)">تعديل</Button>
+            </GridColumn>
+            <GridColumn TItem="Tenant" HeaderText="عمليات" PropertyName="Operations">
+                <Button Color="ButtonColor.Danger" @onclick="()=>OnShowModalClick(context)">حذف</Button>
+            </GridColumn>
+        </GridColumns>
+
+    </Grid>
+}
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    private Modal modal = default!;
+    private List<Tenant>? tenants;
+    private List<ToastMessage> messages = new();
+
+    private async Task<GridDataProviderResult<Tenant>> TenantsDataProvider(GridDataProviderRequest<Tenant> request)
+    {
+        if (tenants == null)
+            tenants = await Http.GetFromJsonAsync<List<Tenant>>("api/Tenant/GetTenants");
+        IEnumerable<Tenant> dataToApply = tenants ?? Enumerable.Empty<Tenant>();
+        return await Task.FromResult(request.ApplyTo(dataToApply));
+    }
+
+    public string? TenantId;
+    public string? TenantName;
+
+    private async Task OnShowModalClick(Tenant tenant)
+    {
+        TenantId = tenant.TId;
+        TenantName = tenant.Name;
+        await modal.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+        TenantId = null;
+        TenantName = null;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenants = await Http.GetFromJsonAsync<List<Tenant>>("api/TenantSettings/GetTenants");
+    }
+
+    private void EditTenant(string id)
+    {
+        Navigation.NavigateTo($"/tenant/{id}");
+    }
+
+    private async Task DeleteTenant(string id)
+    {
+        var response = await Http.DeleteAsync($"api/TenantSettings/DeleteTenant/{id}");
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم حذف المستأجر بنجاح.");
+            tenants = await Http.GetFromJsonAsync<List<Tenant>>("api/TenantSettings/GetTenants");
+        }
+        else
+        {
+            string errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشل في حذف المستأجر. الخطأ: {errorMessage}");
+        }
+        await OnHideModalClick();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void CreateTenant()
+    {
+        Navigation.NavigateTo("/tenant");
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(new ToastMessage
+            {
+                Type = toastType,
+                Title = "تنبيه",
+                Message = message,
+                HelpText = $"{DateTime.Now}"
+            });
+    }
+}

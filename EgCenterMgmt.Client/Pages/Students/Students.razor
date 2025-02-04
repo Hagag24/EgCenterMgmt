@@ -1,0 +1,71 @@
+﻿@page "/students"
+
+@attribute [Authorize(Roles = "Admin, Assistant")]
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<main class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title">بحث عن الطلاب</h5>
+                </div>
+                <div class="mb-3">
+                    <label for="GradeId" class="form-label">الصف</label>
+                    <select id="GradeDropdown" class="form-select mt-2" @bind="selectedGradeId">
+                        <option value="">اختر الصف</option>
+                        @if (Grades != null && Grades.Any())
+                        {
+                            @foreach (var Grade in Grades)
+                            {
+                                <option value="@Grade.GradeId">@Grade.GradeName</option>
+                            }
+                        }
+                        else
+                        {
+                            <option disabled>لا توجد صفوف متاحة</option>
+                        }
+                    </select>
+                </div>
+                <Button Color="ButtonColor.Success" class="w-100 mt-3" @onclick="LoadAttendances" disabled="@(!Grades?.Any() ?? true)">عرض الطلاب</Button>
+
+                @if (isLoading)
+                {
+                    <div class="text-center mt-2">
+                        <span>جار تحميل الطلاب...</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</main>
+
+@code {
+    private IEnumerable<GradeDto>? Grades;
+    private int? selectedGradeId;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            Grades = await Http.GetFromJsonAsync<IEnumerable<GradeDto>>("api/Grade/GetGrades");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void LoadAttendances()
+    {
+        string url =  selectedGradeId.HasValue ? $"/Vstudents/Grade/{selectedGradeId}" : "/Vstudents";
+        Navigation.NavigateTo(url);
+    }
+}

@@ -1,0 +1,143 @@
+﻿@page "/branches"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>الفروع</PageTitle>
+
+<h3>الفروع</h3>
+
+
+<Button Color="ButtonColor.Success" Class="mb-3" @onclick="CreateBranch">إضافة فرع جديد</Button>
+
+@if (branches == null)
+{
+    <p><em>جار التحميل...</em></p>
+}
+else
+{
+    <Modal @ref="modal" Title="تأكيد حذف الفرع">
+        <BodyTemplate>
+            <h5>هل تريد حذف الفرع <h1>"@BranchName"</h1></h5>
+            <h5>ستقوم بحذف كل المجموعات ومواعيدها والحجوزات والمدفوعات المتعلقة بفرع "@BranchName"</h5>
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="OnHideModalClick">رجوع</Button>
+            <Button Color="ButtonColor.Danger" @onclick="() => DeleteBranch(BranchID)">حذف</Button>
+        </FooterTemplate>
+    </Modal>
+
+    <Grid TItem="BranchDto"
+          DataProvider="BranchesDataProvider"
+          AllowFiltering="true"
+          Class="table-hover table"
+          FiltersRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-25"
+          HeaderRowCssClass="bg-primary text-white border-bottom-0"
+          PageSize="150"
+          AllowSorting="true"
+          AllowPaging="true"
+          Responsive="true">
+        <GridColumns>
+            <GridColumn TItem="BranchDto" HeaderText="كود الفرع" PropertyName="كود الفرع" SortKeySelector="item => item.BranchId">
+                @context.BranchId
+            </GridColumn>
+            <GridColumn TItem="BranchDto" HeaderText="إسم الفرع" PropertyName="إسم الفرع" SortKeySelector="item => item.BranchName">
+                @context.BranchName
+            </GridColumn>
+            <GridColumn TItem="BranchDto" HeaderText="موقع الفرع" PropertyName="موقع الفرع" SortKeySelector="item => item.BranchLocation">
+                @context.BranchLocation
+            </GridColumn>
+            <GridColumn TItem="BranchDto" HeaderText="تعديل" PropertyName="عمليات">
+                <Button Color="ButtonColor.Primary" @onclick="() => EditBranch(context.BranchId)">تعديل</Button>
+            </GridColumn>
+            <GridColumn TItem="BranchDto" HeaderText="حذف" PropertyName="عمليات">
+                <Button Color="ButtonColor.Danger" @onclick="()=>OnShowModalClick(context)">حذف</Button>
+            </GridColumn>
+        </GridColumns>
+
+    </Grid>
+
+    
+}
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    private Modal modal = default!;
+    private List<BranchDto>? branches;
+    private List<ToastMessage> messages = new();
+
+    public int BranchID { get; set; }
+    public string? BranchName { get; set; }
+
+    private async Task<GridDataProviderResult<BranchDto>> BranchesDataProvider(GridDataProviderRequest<BranchDto> request)
+    {
+        if (branches is null)
+            branches = await Http.GetFromJsonAsync<List<BranchDto>>("api/Branch/GetBranches");
+        IEnumerable<BranchDto> dataToApply = branches ?? Enumerable.Empty<BranchDto>();
+        return await Task.FromResult(request.ApplyTo(dataToApply));
+    }
+
+    private async Task OnShowModalClick(BranchDto branchDto)
+    {
+        BranchID = branchDto.BranchId;
+        BranchName = branchDto.BranchName;
+        await modal.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+        BranchID = 0;
+        BranchName = null;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        branches = await Http.GetFromJsonAsync<List<BranchDto>>("api/Branch/GetBranches");
+    }
+
+    private void EditBranch(int id)
+    {
+        Navigation.NavigateTo($"/branch?id={id}");
+    }
+
+    private async Task DeleteBranch(int id)
+    {
+        var response = await Http.DeleteAsync($"api/Branch/DeleteBranch?id={id}");
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم حذف الفرع بنجاح.");
+            branches = await Http.GetFromJsonAsync<List<BranchDto>>("api/Branch/GetBranches");
+        }
+        else
+        {
+            string errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشل في حذف الفرع. الخطأ: {errorMessage}");
+        }
+        await OnHideModalClick();
+    }
+
+    private void CreateBranch()
+    {
+        Navigation.NavigateTo("/branch");
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(CreateToastMessage(toastType, message));
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    {
+        return new ToastMessage
+            {
+                Type = toastType,
+                Title = "عملية الحذف",
+                HelpText = $"{DateTime.Now}",
+                Message = message,
+            };
+    }
+}

@@ -1,0 +1,215 @@
+﻿@page "/VBookings"
+@page "/VBookings/group/{GroupId:int?}"
+
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@attribute [Authorize(Roles = "Admin, Assistant")]
+
+<PageTitle>إدارة حجوزات الطلاب</PageTitle>
+
+<h3>حجوزات الطلاب</h3>
+
+<Button Color="ButtonColor.Success" Class="mb-3" @onclick="CreateBooking">إضافة حجز جديد</Button>
+
+@if (Bookings == null)
+{
+    <p><em>جار التحميل...</em></p>
+}
+else
+{
+    <Modal @ref="modal" Title="تأكيد حذف الحجز">
+        <BodyTemplate>
+            <h5>هل تريد حذف الحجز <h1>"@BookingId"</h1></h5>
+            <h5>ستقوم بحذف كل البيانات المرتبطة بهذا الحجز.</h5>
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="OnHideModalClick">رجوع</Button>
+            <Button Color="ButtonColor.Danger" @onclick="() => DeleteBooking(BookingId)">حذف</Button>
+        </FooterTemplate>
+    </Modal>
+
+    <Grid TItem="Vbooking"
+    DataProvider="BookingsDataProvider"
+    AllowFiltering="true"
+    AllowSorting="true"
+    Class="table-hover table"
+    FiltersRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-25"
+    HeaderRowCssClass="bg-primary text-white border-bottom-0"
+    PageSize="150"
+    AllowPaging="true"
+    Responsive="true">
+        <GridColumns>
+            <GridColumn TItem="Vbooking" HeaderText="كود الحجز" PropertyName="BookingId" SortKeySelector="item => item.BookingId">
+                @context.BookingId
+            </GridColumn> 
+            <GridColumn TItem="Vbooking" HeaderText="كود الطالب" PropertyName="Code">
+                @context.Code
+            </GridColumn>
+            <GridColumn TItem="Vbooking" HeaderText="اسم الطالب" PropertyName="StudentName" SortKeySelector="item => item.StudentName">
+                @context.StudentName
+            </GridColumn>
+            <GridColumn TItem="Vbooking" HeaderText="النوع" PropertyName="IsMaile" SortKeySelector="item => item.IsMaile">
+                @(context.IsMaile == true ? "ذكر" : "أنثى")
+            </GridColumn>
+            <GridColumn TItem="Vbooking" HeaderText="اسم المجموعة" PropertyName="GroupName" SortKeySelector="item => item.GroupName">
+                @context.GroupName
+            </GridColumn>
+            <GridColumn TItem="Vbooking" HeaderText="تاريخ الحجز" PropertyName="BookingDate" SortKeySelector="item => item.BookingDate">
+                @((context.BookingDate ?? DateOnly.MinValue).ToString("yyyy-MM-dd"))
+            </GridColumn>
+            <GridColumn TItem="Vbooking" HeaderText="اسم الفرع" PropertyName="BranchName" SortKeySelector="item => item.BranchName">
+                @context.BranchName
+            </GridColumn>
+            <GridColumn TItem="Vbooking" HeaderText="موقع الفرع" PropertyName="BranchLocation" SortKeySelector="item => item.BranchLocation">
+                @context.BranchLocation
+            </GridColumn>
+            <GridColumn TItem="Vbooking" HeaderText="عمليات" PropertyName="Operations">
+                <Button Color="ButtonColor.Primary" @onclick="() => EditBooking(context.BookingId)">تعديل</Button>
+            </GridColumn>
+            <GridColumn TItem="Vbooking" HeaderText="عمليات" PropertyName="Operations">
+                <Button Color="ButtonColor.Danger" @onclick="()=>OnShowModalClick(context)">حذف</Button>
+            </GridColumn>
+        </GridColumns>
+    </Grid>
+}
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    [Parameter]
+    public int? GroupId { get; set; }
+    private Modal modal = default!;
+    private List<Vbooking>? Bookings;
+    private List<ToastMessage> messages = new();
+
+    private async Task<GridDataProviderResult<Vbooking>> BookingsDataProvider(GridDataProviderRequest<Vbooking> request)
+    {
+        if (Bookings == null)
+            Bookings = await Http.GetFromJsonAsync<List<Vbooking>>("api/Booking/VBookings");
+        IEnumerable<Vbooking> dataToApply = Bookings ?? Enumerable.Empty<Vbooking>();
+        return await Task.FromResult(request.ApplyTo(dataToApply));
+    }
+
+    public int BookingId;
+
+    private async Task OnShowModalClick(Vbooking booking)
+    {
+        BookingId = booking.BookingId;
+        await modal.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+        BookingId = 0;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            string url = "api/Booking/VBookings";
+
+            if (GroupId.HasValue)
+            {
+                url = $"api/Booking/VBookingsgroup?groupid={GroupId.Value}";
+            }
+
+            Bookings = await Http.GetFromJsonAsync<List<Vbooking>>(url);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage(ToastType.Danger, $"فشل في تحميل الحجوزات. الخطأ: {ex.Message}");
+        }
+    }
+
+    private void EditBooking(int id)
+    {
+        var fullUrl = Navigation.Uri; // الرابط الحالي
+        var relativePath = GetRelativePath(fullUrl); // استخراج الجزء المطلوب
+        var url = Uri.EscapeDataString(relativePath);
+        Navigation.NavigateTo($"/Bookings/createoredit/{url}/{id}");
+    }
+
+    private async Task DeleteBooking(int id)
+    {
+
+            try
+            {
+                var response = await Http.DeleteAsync($"api/Booking/DeleteBooking?id={id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    ShowMessage(ToastType.Success, "تم حذف الحجز بنجاح.");
+                    await LoadBookings(); // Reload student bookings after deletion
+                }
+                else
+                {
+                    string errorMessage = await response.Content.ReadAsStringAsync();
+                    ShowMessage(ToastType.Danger, $"فشل في حذف الحجز. الخطأ: {errorMessage}");
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowMessage(ToastType.Danger, $"فشل في حذف الحجز. الخطأ: {ex.Message}");
+            }
+        await OnHideModalClick();
+        await OnInitializedAsync();
+    }
+
+    private void CreateBooking()
+    {
+        var fullUrl = Navigation.Uri; // الرابط الحالي
+        var relativePath = GetRelativePath(fullUrl); // استخراج الجزء المطلوب
+        var url = Uri.EscapeDataString(relativePath);
+        Navigation.NavigateTo($"/Bookings/createoredit/{url}");
+    }
+    private string GetRelativePath(string fullUrl)
+    {
+        var uri = new Uri(fullUrl); // تحليل الرابط الكامل
+        return uri.AbsolutePath; // الحصول على المسار فقط
+    }
+    private async Task LoadBookings()
+    {
+        try
+        {
+            string url = "api/Booking/VBookings";
+
+            if (GroupId.HasValue)
+            {
+                url = $"api/Booking/VBookingsgroup?groupid={GroupId.Value}";
+            }
+
+            Bookings = await Http.GetFromJsonAsync<List<Vbooking>>(url);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage(ToastType.Danger, $"فشل في تحميل الحجوزات. الخطأ: {ex.Message}");
+        }
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(CreateToastMessage(toastType, message));
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    {
+        return new ToastMessage
+            {
+                Type = toastType,
+                Title = "إدارة الحجوزات",
+                HelpText = $"{DateTime.Now}",
+                Message = message,
+            };
+    }
+
+    private string GetToastClass(ToastType type) => type switch
+    {
+        ToastType.Success => "toast-success",
+        ToastType.Danger => "toast-danger",
+        ToastType.Info => "toast-info",
+        ToastType.Warning => "toast-warning",
+        _ => "toast-default"
+    };
+}

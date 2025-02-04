@@ -1,0 +1,236 @@
+﻿@page "/Bookings/createoredit/{id:int?}"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin, Assistant")]
+
+<PageTitle>إنشاء أو تعديل حجز الطالب</PageTitle>
+
+<div class="card p-4">
+    <h3 class="text-center">إنشاء أو تعديل حجز الطالب</h3>
+
+    @if (BookingDto == null)
+    {
+        <p><em>جار التحميل...</em></p>
+    }
+    else
+    {
+        <EditForm Model="BookingDto" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-3">
+                <label for="studentId" class="form-label">كود الطالب</label>
+                <input id="studentId" class="form-control" @oninput="FilterStudents" placeholder="ابحث عن الطالب ...." @onclick="() => isStudentDropdownOpen = true" />
+                <select id="studentDropdown" class="form-control" style="display:@GetDropdownDisplay(isStudentDropdownOpen)" @bind="BookingDto.StudentId">
+                    <option value="">اختر الطالب</option>
+                    @if (filteredStudents != null)
+                    {
+                        @foreach (var student in filteredStudents)
+                        {
+                            <option value="@student.StudentId">@student.StudentName</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="groupId" class="form-label">إسم المجموعة</label>
+                <input id="groupId" class="form-control" @oninput="FilterGroups" placeholder="ابحث عن المجموعة ...." @onclick="() => isGroupDropdownOpen = true" />
+                <select id="groupDropdown" class="form-control" style="display:@GetDropdownDisplay(isGroupDropdownOpen)" @bind="BookingDto.GroupId">
+                    <option value="">اختر المجموعة</option>
+                    @if (filteredGroups != null && BookingDto.StudentId != null)
+                    {
+                        @foreach (var group in filteredGroups)
+                        {
+                            <option value="@group.GroupId">@group.GroupName</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="bookingDate" class="form-label">تاريخ الحجز</label>
+                <InputDate id="bookingDate" class="form-control" @bind-Value="BookingDto.BookingDate" />
+            </div>
+
+            <div class="mb-3">
+                <label for="paymentType" class="form-label">نوع الدفع</label>
+                <InputSelect id="paymentType" class="form-control" @bind-Value="BookingDto.PaymentType" @onclick="@(async (e) => grouphaspayment(BookingDto.GroupId))">
+                    <option value="">اختر نوع الدفع</option>
+                    @if (GroupHasMonthlyPayments > 0)
+                    {
+                        <option value="شهري">شهري</option>
+                    }
+                    @if (GroupHasLessonPayments > 0)
+                    {
+                        <option value="حصة">حصة</option>
+                    }
+                    <option value="معفي">معفي</option>
+                    <option value="معفي من المعلم">معفي  من المعلم</option>
+                </InputSelect>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <Button Color="ButtonColor.Success" @onclick="HandleValidSubmit">@((Id.HasValue ? "تحديث" : "إنشاء"))</Button>
+                <Button Color="ButtonColor.Danger"  @onclick="Cancel">إلغاء</Button>
+            </div>
+        </EditForm>
+    }
+    <Toasts class="p-3" Messages="messages" AutoHide="true" Delay="6000" Placement="ToastsPlacement.TopRight" />
+</div>
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    private RegesterBookingDto? BookingDto;
+    private IEnumerable<GroupDto>? groups;
+    private IEnumerable<StudentDto>? students;
+
+    private List<GroupDto>? filteredGroups;
+    private List<StudentDto>? filteredStudents;
+
+    private bool isStudentDropdownOpen = false;
+    private bool isGroupDropdownOpen = false;
+
+    private int gradeid;
+    private decimal GroupHasMonthlyPayments = 0;
+    private decimal GroupHasLessonPayments = 0;
+
+    private List<ToastMessage> messages = new List<ToastMessage>();
+    private string? Message;
+
+    private void FilterStudents(ChangeEventArgs e)
+    {
+        string filterValue = e.Value?.ToString()?.ToLower() ?? string.Empty;
+        filteredStudents = string.IsNullOrWhiteSpace(filterValue)
+            ? students?.ToList()
+            : students?.Where(s => s.Code!.ToLower().Contains(filterValue)).ToList();
+        isStudentDropdownOpen = true;
+
+        StateHasChanged();
+    }
+
+    private void FilterGroups(ChangeEventArgs e)
+    {
+        string filterValue = e.Value?.ToString()?.ToLower() ?? string.Empty;
+        gradeid = students!.FirstOrDefault(s => s.StudentId == BookingDto!.StudentId)?.GradeId ?? 0;
+        filteredGroups = string.IsNullOrWhiteSpace(filterValue)
+            ? groups?.ToList()
+            : groups?.Where(g => g.GroupName!.ToLower().Contains(filterValue) && g.GradeId == gradeid).ToList();
+        isGroupDropdownOpen = true;
+        StateHasChanged();
+    }
+
+    private string GetDropdownDisplay(bool isOpen)
+    {
+        if (isGroupDropdownOpen)
+        {
+            var stgradid = students?.FirstOrDefault(s => s.StudentId == BookingDto?.StudentId);
+            filteredGroups = filteredGroups?.Where(f => f.GradeId == stgradid?.GradeId).ToList();
+        }
+
+        return isOpen ? "block" : "none";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            if (Id.HasValue)
+            {
+                BookingDto = await Http.GetFromJsonAsync<RegesterBookingDto>($"api/Booking/GetBooking?id={Id}");
+            }
+            else
+            {
+                BookingDto = new RegesterBookingDto();
+            }
+            groups = await Http.GetFromJsonAsync<IEnumerable<GroupDto>>("api/Group/GetGroups");
+            students = await Http.GetFromJsonAsync<IEnumerable<StudentDto>>("api/Student/GetStudents");
+
+            filteredGroups = groups?.ToList();
+            filteredStudents = students?.ToList();
+        }
+        catch (Exception ex)
+        {
+            Message = $"فشل في تحميل البيانات. الخطأ: {ex.Message}";
+            ShowMessage(ToastType.Danger);
+        }
+    }
+
+    private void grouphaspayment(int? id)
+    {
+        var gradeDto = groups!.FirstOrDefault(g => g.GroupId == id);
+        if (gradeDto != null)
+        {
+            if (gradeDto.ServingPrice != 0)
+            {
+                GroupHasLessonPayments = gradeDto.ServingPrice;
+            }
+            else
+            {
+                GroupHasLessonPayments = 0;
+            }
+            if (gradeDto.Pricepermonth != 0)
+            {
+                GroupHasMonthlyPayments = gradeDto.Pricepermonth;
+            }
+            else
+            {
+                GroupHasMonthlyPayments = 0;
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            HttpResponseMessage response;
+            if (Id.HasValue)
+            {
+                response = await Http.PutAsJsonAsync($"api/Booking/PutBooking?id={Id}", BookingDto);
+            }
+            else
+            {
+                response = await Http.PostAsJsonAsync("api/Booking/PostBooking", BookingDto);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Message = Id.HasValue ? "تم تحديث الحجز بنجاح." : "تم إنشاء الحجز بنجاح.";
+                ShowMessage(ToastType.Success);
+                Navigation.NavigateTo("/Bookings");
+            }
+            else
+            {
+                string errorMessage = await response.Content.ReadAsStringAsync();
+                Message = $"فشلت العملية. الخطأ: {errorMessage}";
+                ShowMessage(ToastType.Danger);
+            }
+        }
+        catch (Exception ex)
+        {
+            Message = $"فشلت العملية. الخطأ: {ex.Message}";
+            ShowMessage(ToastType.Danger);
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/Bookings");
+    }
+
+    private void ShowMessage(ToastType toastType) => messages.Add(CreateToastMessage(toastType));
+
+    private ToastMessage CreateToastMessage(ToastType toastType)
+        => new ToastMessage
+            {
+                Type = toastType,
+                Title = "عملية تسجيل حضور",
+                HelpText = $"{DateTime.Now}",
+                Message = Message,
+            };
+}

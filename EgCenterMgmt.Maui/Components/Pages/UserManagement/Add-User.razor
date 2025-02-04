@@ -1,0 +1,109 @@
+﻿@page "/add-user"
+@using EgCenterMgmt.Shared.ModelsAuth
+@inject HttpClient Http
+@attribute [Authorize(Roles = "Admin, SuperAdmin")]
+
+<div class="container my-5">
+    <div class="card shadow">
+        <div class="card-header text-center">
+            <h3>إضافة مستخدم جديد</h3>
+        </div>
+        <div class="card-body">
+            <EditForm Model="newUser" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="mb-3">
+                    <label for="UserName" class="form-label">اسم المستخدم</label>
+                    <InputText id="UserName" @bind-Value="newUser.UserName" class="form-control" />
+                    <ValidationMessage For="@(() => newUser.UserName)" class="text-danger" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="Email" class="form-label">البريد الإلكتروني</label>
+                    <InputText id="Email" @bind-Value="newUser.Email" class="form-control" />
+                    <ValidationMessage For="@(() => newUser.Email)" class="text-danger" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="Password" class="form-label">كلمة المرور</label>
+                    <InputText id="Password" @bind-Value="newUser.Password" type="password" class="form-control" />
+                    <ValidationMessage For="@(() => newUser.Password)" class="text-danger" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">الصلاحيات</label>
+                    @if (roles != null)
+                    {
+                        <div class="form-check" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            @foreach (var role in roles)
+                            {
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" @bind-value="role.IsSelected" id="@role.Name" />
+                                    <label class="form-check-label" for="@role.Name">@role.Name</label>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+
+                <div class="mb-3">
+                    <Button Color="ButtonColor.Success" @onclick="HandleValidSubmit" class="btn btn-success">إضافة مستخدم</Button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    private AddUserDto newUser = new AddUserDto
+        {
+            UserId = "",
+            UserName = "",
+            Email = "",
+            Password = "",
+            Roles = new List<string>(),
+        };
+
+    private List<RolesView>? roles;
+    private List<ToastMessage> messages = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            roles = await Http.GetFromJsonAsync<List<RolesView>>("api/UserManagement/GetRoles");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"خطأ في جلب الصلاحيات: {ex.Message}");
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        newUser.Roles = roles!.Where(r => r.IsSelected == true).Select(r => r.Name).ToList()!;
+        var response = await Http.PostAsJsonAsync("api/UserManagement/AddUser", newUser);
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تمت إضافة الستخدم بنجاح.");
+        }
+        else
+        {
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشل في إضافة الستخدم. الخطأ: {errorMessage}");
+        }
+    }
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(new ToastMessage
+            {
+                Type = toastType,
+                Title = "تنبيه",
+                Message = message,
+                HelpText = $"{DateTime.Now}"
+            });
+    }
+}

@@ -1,0 +1,287 @@
+﻿@page "/groups"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@attribute [Authorize(Roles = "Admin, Assistant")]
+
+<PageTitle>إدارة المجموعات</PageTitle>
+
+<h3>المجموعات</h3>
+
+@if (isAdmin)
+{
+    <Button Color="ButtonColor.Success" Class="mb-3" @onclick="CreateGroup">إضافة مجموعة جديدة</Button>
+}
+@if (groups == null)
+{
+    <p><em>إنتظار...</em></p>
+}
+else
+{
+    <Modal @ref="modal" Title="تأكيد حذف المجموعة">
+        <BodyTemplate>
+            <h5>هل تريد حذف <h1>"@GroupName"</h1></h5>
+            <h5>ستقوم بحذف كل البيانات المرتبطة بهذه المجموعة.</h5>
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="OnHideModalClick">رجوع</Button>
+            <Button Color="ButtonColor.Danger" @onclick="() => ConfirmDeleteGroup(GroupId)">حذف</Button>
+        </FooterTemplate>
+    </Modal>
+
+    <Grid TItem="Vgroup"
+    DataProvider="GroupsDataProvider"
+    AllowFiltering="true"
+    AllowSorting="true"
+    Class="table-hover table"
+    FiltersRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-25"
+    HeaderRowCssClass="bg-primary text-white border-bottom-0"
+    PageSize="150"
+    AllowPaging="true"
+    Responsive="true">
+
+
+        <GridColumns>
+            <GridColumn TItem="Vgroup" HeaderText="كود المجموعة" PropertyName="GroupId" SortKeySelector="item => item.GroupId">
+                @context.GroupId
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="المجموعة" PropertyName="GroupName" SortKeySelector="item => item.GroupName">
+                @context.GroupName
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="المدرس" PropertyName="TeacherName" SortKeySelector="item => item.TeacherName">
+                @context.TeacherName
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="الماده" PropertyName="SubjectName" SortKeySelector="item => item.SubjectName">
+                @context.SubjectName
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="الصف" PropertyName="GradeName" SortKeySelector="item => item.GradeName">
+                @context.GradeName
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="عدد طلاب المجموعة" >
+                @(Bookings!.Where(s => s.GroupId == context.GroupId).Count())
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="عدد عدد الطلاب الذكور في المجموعة" >
+                @(Bookings!.Where(s => s.GroupId == context.GroupId && s.IsMaile == true).Count())
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="عدد الطالبات الإناث في المجموعة">
+                @(Bookings!.Where(s => s.GroupId == context.GroupId && s.IsMaile == false).Count())
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="الحد الأقي للمجموعة" PropertyName="MaxLenth" SortKeySelector="item => item.MaxLenth">
+                @context.MaxLenth
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="الفرع" PropertyName="BranchName" SortKeySelector="item => item.BranchName">
+                @context.BranchName
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="موقع الفرع" PropertyName="BranchLocation" SortKeySelector="item => item.BranchLocation">
+                @context.BranchLocation
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="تاريخ البداية" PropertyName="StartDate" SortKeySelector="item => item.StartDate">
+                @((context.StartDate ?? DateOnly.MinValue).ToString("yyyy-MM-dd"))
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="سعر الحصة" PropertyName="ServingPrice" SortKeySelector="item => item.ServingPrice">
+                @context.ServingPrice
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="السعر شهرياً" PropertyName="Pricepermonth" SortKeySelector="item => item.Pricepermonth">
+                @context.Pricepermonth
+            </GridColumn>
+            <GridColumn TItem="Vgroup" HeaderText="عدد الحصص" PropertyName="NumberDayeSattendees" SortKeySelector="item => item.NumberDayeSattendees">
+                @context.NumberDayeSattendees
+            </GridColumn>
+            @if (isAdmin)
+            {
+                <GridColumn TItem="Vgroup" HeaderText="عرض المواعيد" PropertyName="Operations">
+                    <Button Color="ButtonColor.Success" @onclick="() => ViewGroupSchedule(context.GroupId)">عرض مواعيد المجموعة</Button>
+                </GridColumn>  
+                <GridColumn TItem="Vgroup" HeaderText="إضافة موعد" PropertyName="Operations">
+                    <Button Color="ButtonColor.Success" @onclick="() => CreateGroupSchedule(context.GroupId)">إضافة موعد</Button>
+                </GridColumn>
+                <GridColumn TItem="Vgroup" HeaderText="تعديل" PropertyName="Operations">
+                    <Button Color="ButtonColor.Primary" @onclick="() => EditGroup(context.GroupId)">تعديل</Button>
+                </GridColumn>
+                <GridColumn TItem="Vgroup" HeaderText="حذف" PropertyName="Operations">
+                    <Button Color="ButtonColor.Danger" @onclick="() => OnShowModalClick(context)">حذف</Button>
+                </GridColumn>
+            }
+        </GridColumns>
+
+
+    </Grid>
+}
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    private Modal modal = default!;
+    private List<Vgroup>? groups;
+    private List<Vbooking>? Bookings;
+    private List<ToastMessage> messages = new();
+    private bool isAdmin;
+
+    public int GroupId;
+    public string? GroupName;
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Bookings = await Http.GetFromJsonAsync<List<Vbooking>>("api/Booking/VBookings");
+            groups = await Http.GetFromJsonAsync<List<Vgroup>>("api/Group/VGroups");
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            isAdmin = user.IsInRole("Admin");
+        }catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message.ToString());
+        }
+    }
+
+    private async Task<GridDataProviderResult<Vgroup>> GroupsDataProvider(GridDataProviderRequest<Vgroup> request)
+    {
+        if (groups == null)
+            groups = await Http.GetFromJsonAsync<List<Vgroup>>("api/Group/VGroups");
+        IEnumerable<Vgroup> dataToApply = groups ?? Enumerable.Empty<Vgroup>();
+        return await Task.FromResult(request.ApplyTo(dataToApply));
+    }
+
+    private async Task OnShowModalClick(Vgroup group)
+    {
+        GroupId = group.GroupId;
+        GroupName = group.GroupName;
+        await modal.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+        GroupId = 0;
+        GroupName = null;
+    }
+
+    private async Task ConfirmDeleteGroup(int id)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync($"api/Group/DeleteGroup?id={id}");
+            if (response.IsSuccessStatusCode)
+            {
+                ShowMessage(ToastType.Success, "تم حذف المجموعة بنجاح.");
+                groups = await Http.GetFromJsonAsync<List<Vgroup>>("api/Group/VGroups");
+            }
+            else
+            {
+                string errorMessage = await response.Content.ReadAsStringAsync();
+                ShowMessage(ToastType.Danger, $"فشل في حذف المجموعة. الخطأ: {errorMessage}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowMessage(ToastType.Danger, $"فشلت العملية. الخطأ: {ex.Message}");
+        }
+        finally
+        {
+            await OnHideModalClick();
+        }
+    }
+    private void EditGroup(int id)
+    {
+        Navigation.NavigateTo($"/group/{id}");
+    }
+
+    private void CreateGroup()
+    {
+        Navigation.NavigateTo("/group");
+    }
+
+    private void CreateGroupSchedule(int id)
+    {
+        Navigation.NavigateTo($"/groupschedule/group/{id}");
+    }
+    private void ViewGroupSchedule(int id)
+    {
+        Navigation.NavigateTo($"/groupschedules/group/{id}");
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(CreateToastMessage(toastType, message));
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    {
+        return new ToastMessage
+            {
+                Type = toastType,
+                Title = "عمليات إدارة المجموعات",
+                HelpText = $"{DateTime.Now}",
+                Message = message,
+            };
+    }
+}
+@* 
+@code {
+    private Modal modal = default!;
+    private List<Vgroup>? groups;
+
+    private async Task<GridDataProviderResult<Vgroup>> GroupsDataProvider(GridDataProviderRequest<Vgroup> request)
+    {
+        if (groups == null)
+            groups = await Http.GetFromJsonAsync<List<Vgroup>>("api/Group/VGroups");
+        IEnumerable<Vgroup> dataToApply = groups ?? Enumerable.Empty<Vgroup>();
+        return await Task.FromResult(request.ApplyTo(dataToApply));
+    }
+
+    public int GroupId;
+    public string? GroupName;
+
+    private async Task OnShowModalClick(Vgroup group)
+    {
+        GroupId = group.GroupId;
+        GroupName = group.GroupName;
+        await modal.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+        GroupId = 0;
+        GroupName = null;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        groups = await Http.GetFromJsonAsync<List<Vgroup>>("api/Group/VGroups");
+    }
+
+    private void EditGroup(int id)
+    {
+        Navigation.NavigateTo($"/group/{id}");
+    }
+
+    private async Task DeleteGroup(int id)
+    {
+        var response = await Http.DeleteAsync($"api/Group/DeleteGroup?id={id}");
+        if (response.IsSuccessStatusCode)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "تم حذف المجموعة بنجاح.");
+            groups = await Http.GetFromJsonAsync<List<Vgroup>>("api/Group/VGroups");
+        }
+        else
+        {
+            string errorMessage = await response.Content.ReadAsStringAsync();
+            await JSRuntime.InvokeVoidAsync("alert", $"فشل في حذف المجموعة. الخطأ: {errorMessage}");
+        }
+        await OnHideModalClick();
+        await OnInitializedAsync();
+    }
+
+    private void CreateGroup()
+    {
+        Navigation.NavigateTo("/group");
+    }
+    private void CreateGroupSchedule(int id)
+    {
+        Navigation.NavigateTo($"/groupschedule/group/{id}");
+    }
+}
+ *@

@@ -1,0 +1,146 @@
+﻿@page "/teachers"
+@using AutoMapper
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>إدارة المدرسين</PageTitle>
+
+<h3>المدرسين</h3>
+
+<Button Color="ButtonColor.Success" Class="mb-3" @onclick="CreateTeacher">إضافة مدرس جديد</Button>
+
+@if (teachers == null)
+{
+    <p><em>جار التحميل...</em></p>
+}
+else
+{
+    <Modal @ref="modal" Title="تأكيد حذف المدرس">
+        <BodyTemplate>
+            <h5>هل تريد حذف المدرس <h1>"@TeacherName"</h1></h5>
+            <h5>ستقوم بحذف كل البيانات المرتبطة بهذا المدرس.</h5>
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="OnHideModalClick">رجوع</Button>
+            <Button Color="ButtonColor.Danger" @onclick="() => DeleteTeacher(TeacherId)">حذف</Button>
+        </FooterTemplate>
+    </Modal>
+
+    <Grid TItem="TeacherDto"
+          DataProvider="TeachersDataProvider"
+          AllowFiltering="true"
+          AllowSorting="true"
+          Class="table-hover table"
+          FiltersRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-25"
+          HeaderRowCssClass="bg-primary text-white border-bottom-0"
+          PageSize="150"
+          AllowPaging="true"
+          Responsive="true">
+        <GridColumns>
+            <GridColumn TItem="TeacherDto" HeaderText="كود المدرس" PropertyName="TeacherId" SortKeySelector="item => item.TeacherId">
+                @context.TeacherId
+            </GridColumn>
+            <GridColumn TItem="TeacherDto" HeaderText="اسم المدرس" PropertyName="TeacherName" SortKeySelector="item => item.TeacherName">
+                @context.TeacherName
+            </GridColumn>
+            <GridColumn TItem="TeacherDto" HeaderText="البريد الإلكتروني" PropertyName="TeacherEmail" SortKeySelector="item => item.TeacherEmail">
+                @context.TeacherEmail
+            </GridColumn>
+            <GridColumn TItem="TeacherDto" HeaderText="رقم الهاتف" PropertyName="TeacherPhone" SortKeySelector="item => item.TeacherPhone">
+                @context.TeacherPhone
+            </GridColumn>
+            <GridColumn TItem="TeacherDto" HeaderText="رقم الواتساب" PropertyName="TeacherWhatsApp" SortKeySelector="item => item.TeacherWhatsApp">
+                @context.TeacherWhatsApp
+            </GridColumn>
+            <GridColumn TItem="TeacherDto" HeaderText="التخصص" PropertyName="TeacherSpecialization" SortKeySelector="item => item.TeacherSpecialization">
+                @context.TeacherSpecialization
+            </GridColumn>
+            <GridColumn TItem="TeacherDto" HeaderText="عمليات" PropertyName="Operations">
+                <Button Color="ButtonColor.Primary" @onclick="() => EditTeacher(context.TeacherId)">تعديل</Button>
+            </GridColumn>
+            <GridColumn TItem="TeacherDto" HeaderText="عمليات" PropertyName="Operations">
+                <Button Color="ButtonColor.Danger" @onclick="()=>OnShowModalClick(context)">حذف</Button>
+            </GridColumn>
+        </GridColumns>
+
+    </Grid>
+}
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    private Modal modal = default!;
+    private List<TeacherDto>? teachers;
+    private List<ToastMessage> messages = new();
+
+    private async Task<GridDataProviderResult<TeacherDto>> TeachersDataProvider(GridDataProviderRequest<TeacherDto> request)
+    {
+        if (teachers == null)
+            teachers = await Http.GetFromJsonAsync<List<TeacherDto>>("api/Teacher/GetTeachers");
+        IEnumerable<TeacherDto> dataToApply = teachers ?? Enumerable.Empty<TeacherDto>();
+        return await Task.FromResult(request.ApplyTo(dataToApply));
+    }
+
+    public int TeacherId;
+    public string? TeacherName;
+
+    private async Task OnShowModalClick(TeacherDto teacher)
+    {
+        TeacherId = teacher.TeacherId;
+        TeacherName = teacher.TeacherName;
+        await modal.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+        TeacherId = 0;
+        TeacherName = null;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        teachers = await Http.GetFromJsonAsync<List<TeacherDto>>("api/Teacher/GetTeachers");
+    }
+
+    private void EditTeacher(int id)
+    {
+        Navigation.NavigateTo($"/teacher/{id}");
+    }
+
+    private async Task DeleteTeacher(int id)
+    {
+        var response = await Http.DeleteAsync($"api/Teacher/DeleteTeacher/{id}");
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم حذف المدرس بنجاح.");
+            teachers = await Http.GetFromJsonAsync<List<TeacherDto>>("api/Teacher/GetTeachers");
+        }
+        else
+        {
+            string errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشل في حذف المدرس. الخطأ: {errorMessage}");
+        }
+        await OnHideModalClick();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void CreateTeacher()
+    {
+        Navigation.NavigateTo("/teacher");
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(new ToastMessage
+            {
+                Type = toastType,
+                Title = "تنبيه",
+                Message = message,
+                HelpText = $"{DateTime.Now}"
+            });
+    }
+}
+
+

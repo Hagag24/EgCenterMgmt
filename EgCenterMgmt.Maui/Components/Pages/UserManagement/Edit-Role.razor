@@ -1,0 +1,83 @@
+﻿@page "/edit-role/{userId}"
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@attribute [Authorize(Roles = "Admin")]
+
+<div class="container mt-4">
+    <h3 class="text-center mb-4">تعديل الصلاحيات</h3>
+
+    <div class="card">
+        <div class="card-body">
+            <EditForm Model="updateRoleModel" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="mb-3">
+                    <label class="form-label">الصلاحيات</label>
+                    @if (roles != null)
+                    {
+                        <div class="form-check" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            @foreach (var role in roles)
+                            {
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" @bind-value="role.IsSelected" checked="role.IsSelected" id="@role.Name" />
+                                    <label class="form-check-label" for="@role.Name">@role.Name</label>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">جار تحميل الصلاحيات...</p>
+                    }
+                </div>
+
+                <button type="submit" class="btn btn-success btn-block">تحديث الصلاحيات</button>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    [Parameter]
+    public string? userId { get; set; }
+    private UpdateUserRoleDto updateRoleModel = new UpdateUserRoleDto();
+    private List<RolesView>? roles;
+    private List<ToastMessage> messages = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        roles = await Http.GetFromJsonAsync<List<RolesView>>($"api/UserManagement/GetRole?userid={userId}");
+        updateRoleModel.UserId = userId;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        updateRoleModel.Roles = roles!.Where(r => r.IsSelected).Select(r => r.Name).ToList()!;
+        var response = await Http.PutAsJsonAsync("api/UserManagement/UpdateUserRole", updateRoleModel);
+
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم تحديث الصلاحيات بنجاح!");
+            await Task.Delay(2000); // Wait for 2 seconds
+            NavigationManager.NavigateTo("/users");
+        }
+        else
+        {
+            ShowMessage(ToastType.Danger, "حدث خطأ أثناء تحديث الصلاحيات. يرجى المحاولة مرة أخرى.");
+        }
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(new ToastMessage
+            {
+                Type = toastType,
+                Title = "تنبيه",
+                Message = message,
+                HelpText = $"{DateTime.Now}"
+            });
+    }
+}

@@ -1,0 +1,171 @@
+﻿@page "/AttendanceCancellations"
+@using AutoMapper
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>إدارة إلغاء الحضور</PageTitle>
+
+<h3>إلغاء الحضور</h3>
+
+
+@if (Cancellations == null)
+{
+    <p><em>جار التحميل...</em></p>
+}
+else
+{
+    <Modal @ref="modal" Title="تأكيد حذف إلغاء الحضور">
+        <BodyTemplate>
+            <h5>هل تريد حذف إلغاء الحضور <h1>"@CancellationId"</h1></h5>
+            <h5>ستقوم بحذف كل البيانات المرتبطة بهذا الإلغاء.</h5>
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="OnHideModalClick">رجوع</Button>
+            <Button Color="ButtonColor.Danger" @onclick="() => DeleteCancellation(CancellationId)">حذف</Button>
+        </FooterTemplate>
+    </Modal>
+
+    <Grid TItem="VAttendanceCancellation"
+          DataProvider="CancellationsDataProvider"
+          AllowFiltering="true"
+          AllowSorting="true"
+          Class="table-hover table"
+          FiltersRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-25"
+          HeaderRowCssClass="bg-primary text-white border-bottom-0"
+          PageSize="150"
+          AllowPaging="true"
+          Responsive="true">
+        <GridColumns>
+            <!-- عمود اسم الطالب -->
+            <GridColumn TItem="VAttendanceCancellation" HeaderText="اسم الطالب" PropertyName="StudentName" SortKeySelector="item => item.StudentName">
+                @context.StudentName
+            </GridColumn>
+
+            <!-- عمود اسم المجموعة -->
+            <GridColumn TItem="VAttendanceCancellation" HeaderText="اسم المجموعة" PropertyName="GroupName" SortKeySelector="item => item.GroupName">
+                @context.GroupName
+            </GridColumn>
+
+            <!-- عمود تاريخ الإلغاء -->
+            <GridColumn TItem="VAttendanceCancellation" HeaderText="تاريخ الإلغاء" PropertyName="CancellationDate" SortKeySelector="item => item.CancellationDate">
+                @context.CancellationDate.ToString("yyyy-MM-dd")
+            </GridColumn>
+
+            <!-- عمود سبب الإلغاء -->
+            <GridColumn TItem="VAttendanceCancellation" HeaderText="سبب الإلغاء" PropertyName="Reason">
+                @context.Reason
+            </GridColumn>
+
+            <!-- عمود اسم المستخدم -->
+            <GridColumn TItem="VAttendanceCancellation" HeaderText="اسم المستخدم" PropertyName="UserName" SortKeySelector="item => item.UserName">
+                @context.UserName
+            </GridColumn>
+
+            <!-- عمود العمليات -->
+            <GridColumn TItem="VAttendanceCancellation" HeaderText="عمليات" PropertyName="Operations">
+                <Button Color="ButtonColor.Danger" @onclick="()=>OnShowModalClick(context)">حذف</Button>
+            </GridColumn>
+        </GridColumns>
+    </Grid>
+}
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    private Modal modal = default!;
+    private List<VAttendanceCancellation>? Cancellations;
+    private List<ToastMessage> messages = new();
+    public int CancellationId;
+
+    private async Task<GridDataProviderResult<VAttendanceCancellation>> CancellationsDataProvider(GridDataProviderRequest<VAttendanceCancellation> request)
+    {
+        if (Cancellations == null)
+            Cancellations = await Http.GetFromJsonAsync<List<VAttendanceCancellation>>("api/AttendanceCancellation/GetAllCancellations");
+        IEnumerable<VAttendanceCancellation> dataToApply = Cancellations ?? Enumerable.Empty<VAttendanceCancellation>();
+        return await Task.FromResult(request.ApplyTo(dataToApply));
+    }
+
+    private async Task OnShowModalClick(VAttendanceCancellation cancellation)
+    {
+        CancellationId = cancellation.Id;
+        await modal.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+        CancellationId = 0;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Cancellations = await Http.GetFromJsonAsync<List<VAttendanceCancellation>>("api/AttendanceCancellation/GetAllCancellations");
+        }
+        catch (Exception ex)
+        {
+            ShowMessage(ToastType.Danger, $"فشل في تحميل إلغاء الحضور. الخطأ: {ex.Message}");
+        }
+    }
+    private async Task DeleteCancellation(int id)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync($"api/AttendanceCancellation/DeleteCancellation/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                ShowMessage(ToastType.Success, "تم حذف إلغاء الحضور بنجاح.");
+                await LoadCancellations(); // Reload attendance cancellations after deletion
+            }
+            else
+            {
+                string errorMessage = await response.Content.ReadAsStringAsync();
+                ShowMessage(ToastType.Danger, $"فشل في حذف إلغاء الحضور. الخطأ: {errorMessage}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowMessage(ToastType.Danger, $"فشل في حذف إلغاء الحضور. الخطأ: {ex.Message}");
+        }
+        await OnHideModalClick();
+        await OnInitializedAsync();
+    }
+
+    private async Task LoadCancellations()
+    {
+        try
+        {
+            Cancellations = await Http.GetFromJsonAsync<List<VAttendanceCancellation>>("api/AttendanceCancellation/GetAllCancellations");
+        }
+        catch (Exception ex)
+        {
+            ShowMessage(ToastType.Danger, $"فشل في تحميل إلغاء الحضور. الخطأ: {ex.Message}");
+        }
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(CreateToastMessage(toastType, message));
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    {
+        return new ToastMessage
+            {
+                Type = toastType,
+                Title = "إدارة إلغاء الحضور",
+                HelpText = $"{DateTime.Now}",
+                Message = message,
+            };
+    }
+
+    private string GetToastClass(ToastType type) => type switch
+    {
+        ToastType.Success => "toast-success",
+        ToastType.Danger => "toast-danger",
+        ToastType.Info => "toast-info",
+        ToastType.Warning => "toast-warning",
+        _ => "toast-default"
+    };
+}

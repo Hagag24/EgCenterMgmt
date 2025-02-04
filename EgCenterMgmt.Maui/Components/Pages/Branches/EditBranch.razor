@@ -1,0 +1,108 @@
+﻿@page "/branch"
+@page "/branch/{id:int}"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>@(id.HasValue ? "تعديل الفرع" : "إنشاء فرع جديد")</PageTitle>
+
+<h3>@(id.HasValue ? "تعديل الفرع" : "إنشاء فرع جديد")</h3>
+
+@if (branchDto == null)
+{
+    <p><em>جار التحميل...</em></p>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <EditForm Model="branchDto" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="mb-3">
+                    <label for="branchName" class="form-label">اسم الفرع</label>
+                    <InputText id="branchName" class="form-control" @bind-Value="branchDto.BranchName" />
+                </div>
+                <div class="mb-3">
+                    <label for="branchLocation" class="form-label">موقع الفرع</label>
+                    <InputText id="branchLocation" class="form-control" @bind-Value="branchDto.BranchLocation" />
+                </div>
+                <div class="d-flex justify-content-between">
+                    <Button Color="ButtonColor.Success" @onclick="HandleValidSubmit">@((id.HasValue ? "تحديث" : "إنشاء"))</Button>
+                    <Button Color="ButtonColor.Danger" @onclick="Cancel">إلغاء</Button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    [Parameter] public int? id { get; set; }
+    private BranchDto? branchDto = new BranchDto();
+    private List<ToastMessage> messages = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (id.HasValue)
+        {
+            branchDto = await Http.GetFromJsonAsync<BranchDto>($"api/Branch/GetBranch?id={id}");
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        HttpResponseMessage response;
+
+        try
+        {
+            if (id.HasValue)
+            {
+                // تحديث الفرع
+                response = await Http.PutAsJsonAsync($"api/Branch/PutBranch?id={id}", branchDto);
+            }
+            else
+            {
+                // إنشاء فرع جديد
+                response = await Http.PostAsJsonAsync("api/Branch/PostBranch", branchDto);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                ShowMessage(ToastType.Success, id.HasValue ? "تم تحديث الفرع بنجاح." : "تم إنشاء الفرع بنجاح.");
+            }
+            else
+            {
+                string errorMessage = await response.Content.ReadAsStringAsync();
+                ShowMessage(ToastType.Danger, $"فشلت العملية. الخطأ: {errorMessage}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowMessage(ToastType.Danger, $"فشلت العملية. الخطأ: {ex.Message}");
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/branches");
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(CreateToastMessage(toastType, message));
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    {
+        return new ToastMessage
+            {
+                Type = toastType,
+                Title = "عملية الفرع",
+                HelpText = $"{DateTime.Now}",
+                Message = message,
+            };
+    }
+}

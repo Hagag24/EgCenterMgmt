@@ -1,0 +1,112 @@
+﻿@page "/centerrates"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin")]
+
+<h3>نسب السنتر</h3>
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+<Modal @bind-IsVisible="isModalVisible" Title="تأكيد الحذف" Body="هل أنت متأكد أنك تريد حذف هذه النسبة؟" OnConfirm="OnConfirmDelete" />
+
+@if (rates == null)
+{
+    <p><em>جارٍ التحميل...</em></p>
+}
+else
+{
+    <NavLink class="btn btn-success mb-3" @onclick="CreateRate">إنشاء نسبة جديد</NavLink>
+
+    <Grid TItem="CenterRateDto"
+    DataProvider="RatesDataProvider"
+    AllowFiltering="true"
+    Class="table-hover table"
+    FiltersRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-25"
+    HeaderRowCssClass="bg-primary text-white border-bottom-0"
+    PageSize="150"
+    AllowSorting="true"
+    AllowPaging="true"
+    Responsive="true">
+        <GridColumns>
+            <GridColumn TItem="CenterRateDto" HeaderText="كود النسبة" PropertyName="Id">
+                @context.Id
+            </GridColumn>
+            <GridColumn TItem="CenterRateDto" HeaderText="نسبة الحصة" PropertyName="RateSession">
+                @context.RateSession
+            </GridColumn>
+            <GridColumn TItem="CenterRateDto" HeaderText="نسبة الشهر" PropertyName="RateMonthly">
+                @context.RateMonthly
+            </GridColumn>
+            <GridColumn TItem="CenterRateDto" HeaderText="الشهر المحسوب عليه" PropertyName="Rate">
+                @context.Rate
+            </GridColumn>
+            <GridColumn TItem="CenterRateDto" HeaderText="حذف" PropertyName="Operations">
+                <Button Color="ButtonColor.Danger" @onclick="() => ShowModal(context.Id)">حذف</Button>
+            </GridColumn>
+        </GridColumns>
+    </Grid>
+}
+
+@code {
+    private List<CenterRateDto>? rates;
+    private List<ToastMessage> messages = new();
+    private bool isModalVisible = false;
+    private int rateIdToDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            rates = await Http.GetFromJsonAsync<List<CenterRateDto>>("api/CenterRate/GetRates");
+
+        }catch(Exception ex)
+        {
+            Console.WriteLine(ex.Message.ToString());
+        }
+    }
+
+    private async Task<GridDataProviderResult<CenterRateDto>> RatesDataProvider(GridDataProviderRequest<CenterRateDto> request)
+    {
+        var allRates = await Http.GetFromJsonAsync<List<CenterRateDto>>("api/CenterRate/GetRates");
+        var filteredRates = request.ApplyTo(allRates!.AsQueryable());
+        return await Task.FromResult(filteredRates);
+    }
+
+    private void CreateRate()
+    {
+        Navigation.NavigateTo("/CenterRates/create");
+    }
+
+    private void ShowModal(int id)
+    {
+        rateIdToDelete = id;
+        isModalVisible = true;
+    }
+
+    private async Task OnConfirmDelete(bool confirm)
+    {
+        if (confirm)
+        {
+            var response = await Http.DeleteAsync($"api/CenterRate/DeleteRate/{rateIdToDelete}");
+            if (response.IsSuccessStatusCode)
+            {
+                rates = rates!.Where(r => r.Id != rateIdToDelete).ToList();
+                messages.Add(CreateToastMessage(ToastType.Success, "تم حذف النسبة بنجاح!"));
+            }
+            else
+            {
+                messages.Add(CreateToastMessage(ToastType.Danger, $"خطأ في حذف المعدل: {response.ReasonPhrase}"));
+            }
+        }
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    {
+        return new ToastMessage
+            {
+                Type = toastType,
+                Title = "عملية الحذف",
+                HelpText = $"{DateTime.Now}",
+                Message = message,
+            };
+    }
+}

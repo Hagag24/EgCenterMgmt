@@ -1,0 +1,497 @@
+﻿@inherits LayoutComponentBase
+
+@inject IAccountManagement AccountManagement
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<style>
+    aside{
+        border-left: 2px solid #712cf945;
+        box-shadow: -1px 0 10px rgba(113, 44, 249, 0.2);
+    }
+</style>
+<div class="bb-page">
+    <Sidebar @ref="sidebar"
+    Href="/"
+    Title="@($"{TenantName}")"
+    DataProvider="Sidebar2DataProvider" />
+    <main>
+        <div class="bb-top-row px-4 d-flex justify-content-between">
+            <Icon Name="IconName.List" role="button" @onclick="ToggleSidebar" />
+            <Button Style="background-color: #712cf9; color: white;" @onclick="Logout">تسجيل خروج</Button>
+        </div>
+
+        <article class="content px-4">
+            <div class="py-2">@Body</div>
+        </article>
+    </main>
+</div>
+
+@code {
+    Sidebar? sidebar = default!;
+    IEnumerable<NavItem>? navItems;
+    private string TenantName { get; set; } = "EG_Center";
+
+    protected override void OnInitialized()
+    {
+        var userRole = UserDaitels.Roles;
+        TenantName = UserDaitels.TenantName ?? "EG_Center";
+        if (userRole.Any(r => r == "SuperAdmin"))
+        {
+            navItems = GetNavItemsSuper();
+        }
+        else if (userRole.Any(r => r == "Admin"))
+        {
+            navItems = GetNavItems(); 
+        }
+        else if (userRole.Any(r => r == "Assistant"))
+        {
+            navItems = GetNavItems2();
+        }
+
+    }
+
+    private async Task<SidebarDataProviderResult> Sidebar2DataProvider(SidebarDataProviderRequest request)
+    {
+        return await Task.FromResult(request.ApplyTo(navItems!));
+    }
+    private void ToggleSidebar() => sidebar!.ToggleSidebar();
+
+    private IEnumerable<NavItem> GetNavItemsSuper()
+    {
+        var navItems = new List<NavItem>
+    {
+        // ------ القائمة الرئيسية ------
+        new NavItem {
+            Id = "1",
+            Href = "/",
+            IconName = IconName.HouseDoorFill,
+            IconColor = IconColor.Warning,
+            Text = "الرئيسية",
+            Match = NavLinkMatch.All
+        },
+
+        // ------ الهيكل التنظيمي ------
+        new NavItem {
+            Id = "2",
+            Href = "/branches",
+            IconName = IconName.Bank2,
+            IconColor = IconColor.Info,
+            Text = "الفروع"
+        },
+
+        new NavItem {
+            Id = "5",
+            Href = "/grades",
+            IconName = IconName.LayersFill,
+            IconColor = IconColor.Primary,
+            Text = "الصفوف"
+        },
+
+        new NavItem {
+            Id = "6",
+            Href = "/subjects",
+            IconName = IconName.JournalBookmarkFill,
+            IconColor = IconColor.Secondary,
+            Text = "المواد"
+        },
+
+        // ------ الكوادر التعليمية ------
+        new NavItem {
+            Id = "3",
+            Href = "/teachers",
+            IconName = IconName.PersonBadgeFill,
+            IconColor = IconColor.Success,
+            Text = "المدرسين"
+        },
+
+        // ------ إدارة الطلاب ------
+        new NavItem {
+            Id = "4",            
+            Href = "/students",
+            IconName = IconName.PeopleFill,
+            IconColor = IconColor.Primary,
+            Text = "الطلاب"
+        },
+        new NavItem {
+            Id = "43",
+            Href = "/student-booking",
+            IconName = IconName.Calendar2PlusFill,
+            IconColor = IconColor.Success,
+            Text = "إضافة طالب مع الحجز"
+        },
+
+        // ------ المجموعات والجداول ------
+        new NavItem {
+            Id = "7",
+            Href = "/groups",
+            IconName = IconName.PersonSquare,
+            IconColor = IconColor.Info,
+            Text = "المجموعات"
+        },
+
+        new NavItem {
+            Id = "8",
+            Href = "/groupschedules",
+            IconName = IconName.Calendar2RangeFill,
+            IconColor = IconColor.Primary,
+            Text = "جداول المجموعات"
+        },
+
+        // ------ العمليات المالية ------
+        new NavItem {
+            Id = "9",
+            Href = "/Bookings",
+            IconName = IconName.CalendarCheckFill,
+            IconColor = IconColor.Success,
+            Text = "حجوزات الطلاب"
+        },
+
+        new NavItem {
+            Id = "10",
+            Href = "/Payments",
+            IconName = IconName.CashCoin,
+            IconColor = IconColor.Warning,
+            Text = "مدفوعات الطلاب"
+        },
+
+        new NavItem {
+            Id = "13",
+            Href = "/expenses",
+            IconName = IconName.CurrencyExchange,
+            IconColor = IconColor.Danger,
+            Text = "المصروفات"
+        },
+
+        // ------ الحضور والغياب ------
+        new NavItem {
+            Id = "111",
+            Href = "/attendances",
+            IconName = IconName.Clipboard2CheckFill,
+            IconColor = IconColor.Primary,
+            Text = "تسجيل الحضور"
+        },
+        new NavItem {
+            Id = "115",
+            Href = "/reportvattendances",
+            IconName = IconName.BarChartLineFill,
+            IconColor = IconColor.Info,
+            Text = "كشف حضور"
+        },
+
+        new NavItem {
+            Id = "12",
+            Href = "/AttendanceCancellations",
+            IconName = IconName.XCircleFill,
+            IconColor = IconColor.Danger,
+            Text = "تسجيلات الحضور الملغية"
+        },
+
+        // ------ التقارير والإحصائيات ------
+        new NavItem {
+            Id = "141",
+            Href = "/PaymentAnalysis",
+            IconName = IconName.PieChartFill,
+            IconColor = IconColor.Info,
+            Text = "الحسابات"
+        },
+
+        new NavItem {
+            Id = "15",
+            Href = "/centerrates",
+            IconName = IconName.Percent,
+            IconColor = IconColor.Primary,
+            Text = "نسب السنتر"
+        },
+
+        // ------ الإدارة العامة ------
+        new NavItem {
+            Id = "16",
+            Href = "/users",
+            IconName = IconName.PersonGear,
+            IconColor = IconColor.Secondary,
+            Text = "المستخدمين"
+        },
+
+        new NavItem {
+            Id = "171",
+            Href = "/user-profile",
+            IconName = IconName.PersonLinesFill,
+            IconColor = IconColor.Primary,
+            Text = "البروفايل",
+            ParentId = "17"
+        },
+
+        new NavItem {
+            Id = "18",
+            Href = "/tenants",
+            IconName = IconName.BuildingGear,
+            IconColor = IconColor.Secondary,
+            Text = "المستأجرين"
+        },
+    };
+
+        return navItems;
+    }
+    private IEnumerable<NavItem> GetNavItems()
+    {
+        navItems = new List<NavItem>
+    {
+// ------ القائمة الرئيسية ------
+        new NavItem {
+            Id = "1",
+            Href = "/",
+            IconName = IconName.HouseDoorFill,
+            IconColor = IconColor.Warning,
+            Text = "الرئيسية",
+            Match = NavLinkMatch.All
+        },
+
+        // ------ الهيكل التنظيمي ------
+        new NavItem {
+            Id = "2",
+            Href = "/branches",
+            IconName = IconName.Bank2,
+            IconColor = IconColor.Info,
+            Text = "الفروع"
+        },
+
+        new NavItem {
+            Id = "5",
+            Href = "/grades",
+            IconName = IconName.LayersFill,
+            IconColor = IconColor.Primary,
+            Text = "الصفوف"
+        },
+
+        new NavItem {
+            Id = "6",
+            Href = "/subjects",
+            IconName = IconName.JournalBookmarkFill,
+            IconColor = IconColor.Secondary,
+            Text = "المواد"
+        },
+
+        // ------ الكوادر التعليمية ------
+        new NavItem {
+            Id = "3",
+            Href = "/teachers",
+            IconName = IconName.PersonBadgeFill,
+            IconColor = IconColor.Success,
+            Text = "المدرسين"
+        },
+
+        // ------ إدارة الطلاب ------
+        new NavItem {
+            Id = "4",
+            Href = "/students",
+            IconName = IconName.PeopleFill,
+            IconColor = IconColor.Primary,
+            Text = "الطلاب"
+        },
+        new NavItem {
+            Id = "43",
+            Href = "/student-booking",
+            IconName = IconName.Calendar2PlusFill,
+            IconColor = IconColor.Success,
+            Text = "إضافة طالب مع الحجز"
+        },
+
+        // ------ المجموعات والجداول ------
+        new NavItem {
+            Id = "7",
+            Href = "/groups",
+            IconName = IconName.PersonSquare,
+            IconColor = IconColor.Info,
+            Text = "المجموعات"
+        },
+
+        new NavItem {
+            Id = "8",
+            Href = "/groupschedules",
+            IconName = IconName.Calendar2RangeFill,
+            IconColor = IconColor.Primary,
+            Text = "جداول المجموعات"
+        },
+
+        // ------ العمليات المالية ------
+        new NavItem {
+            Id = "9",
+            Href = "/Bookings",
+            IconName = IconName.CalendarCheckFill,
+            IconColor = IconColor.Success,
+            Text = "حجوزات الطلاب"
+        },
+
+        new NavItem {
+            Id = "10",
+            Href = "/Payments",
+            IconName = IconName.CashCoin,
+            IconColor = IconColor.Warning,
+            Text = "مدفوعات الطلاب"
+        },
+
+        new NavItem {
+            Id = "13",
+            Href = "/expenses",
+            IconName = IconName.CurrencyExchange,
+            IconColor = IconColor.Danger,
+            Text = "المصروفات"
+        },
+
+        // ------ الحضور والغياب ------
+        new NavItem {
+            Id = "111",
+            Href = "/attendances",
+            IconName = IconName.Clipboard2CheckFill,
+            IconColor = IconColor.Primary,
+            Text = "تسجيل الحضور"
+        },
+        new NavItem {
+            Id = "115",
+            Href = "/reportvattendances",
+            IconName = IconName.BarChartLineFill,
+            IconColor = IconColor.Info,
+            Text = "كشف حضور"
+        },
+
+        new NavItem {
+            Id = "12",
+            Href = "/AttendanceCancellations",
+            IconName = IconName.XCircleFill,
+            IconColor = IconColor.Danger,
+            Text = "تسجيلات الحضور الملغية"
+        },
+
+        // ------ التقارير والإحصائيات ------
+        new NavItem {
+            Id = "141",
+            Href = "/PaymentAnalysis",
+            IconName = IconName.PieChartFill,
+            IconColor = IconColor.Info,
+            Text = "الحسابات"
+        },
+
+        new NavItem {
+            Id = "15",
+            Href = "/centerrates",
+            IconName = IconName.Percent,
+            IconColor = IconColor.Primary,
+            Text = "نسب السنتر"
+        },
+
+        // ------ الإدارة العامة ------
+        new NavItem {
+            Id = "16",
+            Href = "/users",
+            IconName = IconName.PersonGear,
+            IconColor = IconColor.Secondary,
+            Text = "المستخدمين"
+        },
+
+        new NavItem {
+            Id = "171",
+            Href = "/user-profile",
+            IconName = IconName.PersonLinesFill,
+            IconColor = IconColor.Primary,
+            Text = "البروفايل",
+            ParentId = "17"
+        },
+    };
+
+        return navItems;
+    }
+
+
+
+    private IEnumerable<NavItem> GetNavItems2()
+    {
+        var navItems = new List<NavItem>
+    {
+
+// ------ القائمة الرئيسية ------
+        new NavItem {
+            Id = "1",
+            Href = "/",
+            IconName = IconName.HouseDoorFill,
+            IconColor = IconColor.Warning,
+            Text = "الرئيسية",
+            Match = NavLinkMatch.All
+        },
+        // ------ إدارة الطلاب ------
+        new NavItem {
+            Id = "4",
+            Href = "/students",
+            IconName = IconName.PeopleFill,
+            IconColor = IconColor.Primary,
+            Text = "الطلاب"
+        },
+        new NavItem {
+            Id = "43",
+            Href = "/student-booking",
+            IconName = IconName.Calendar2PlusFill,
+            IconColor = IconColor.Success,
+            Text = "إضافة طالب مع الحجز"
+        },
+
+        // ------ المجموعات والجداول ------
+        new NavItem {
+            Id = "7",
+            Href = "/groups",
+            IconName = IconName.PersonSquare,
+            IconColor = IconColor.Info,
+            Text = "المجموعات"
+        },
+
+        new NavItem {
+            Id = "8",
+            Href = "/groupschedules",
+            IconName = IconName.Calendar2RangeFill,
+            IconColor = IconColor.Primary,
+            Text = "جداول المجموعات"
+        },
+                // ------ العمليات المالية ------
+        new NavItem {
+            Id = "9",
+            Href = "/Bookings",
+            IconName = IconName.CalendarCheckFill,
+            IconColor = IconColor.Success,
+            Text = "حجوزات الطلاب"
+        },
+        // ------ الحضور والغياب ------
+        new NavItem {
+            Id = "111",
+            Href = "/attendances",
+            IconName = IconName.Clipboard2CheckFill,
+            IconColor = IconColor.Primary,
+            Text = "تسجيل الحضور"
+        },
+        new NavItem {
+            Id = "115",
+            Href = "/reportvattendances",
+            IconName = IconName.BarChartLineFill,
+            IconColor = IconColor.Info,
+            Text = "كشف حضور"
+        }, 
+        // ------ الإدارة العامة ------
+        new NavItem {
+            Id = "171",
+            Href = "/user-profile",
+            IconName = IconName.PersonLinesFill,
+            IconColor = IconColor.Primary,
+            Text = "البروفايل",
+            ParentId = "17"
+        },
+
+    };
+
+        return navItems;
+    }
+
+
+    private async Task Logout()
+    {
+        await AccountManagement.LogoutAsync();
+        Navigation.NavigateTo("/login");
+    }
+}

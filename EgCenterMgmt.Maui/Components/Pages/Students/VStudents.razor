@@ -1,0 +1,215 @@
+﻿@page "/Vstudents"
+@page "/Vstudents/Grade/{GradeId:int?}"
+
+@using AutoMapper
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@attribute [Authorize(Roles = "Admin, Assistant")]
+
+<PageTitle>إدارة الطلاب</PageTitle>
+
+<h3>الطلاب</h3>
+
+<Button Color="ButtonColor.Success" Class="mb-3" @onclick="CreateStudent">إضافة طالب جديد</Button>
+
+@if (students == null)
+{
+    <p><em>جار التحميل...</em></p>
+}
+else
+{
+    <Modal @ref="modal" Title="تأكيد حذف الطالب">
+        <BodyTemplate>
+            <h5>هل تريد حذف الطالب <h1>"@StudentName"</h1></h5>
+            <h5>ستقوم بحذف كل البيانات المرتبطة بهذا الطالب.</h5>
+        </BodyTemplate>
+        <FooterTemplate>
+            <Button Color="ButtonColor.Secondary" @onclick="OnHideModalClick">رجوع</Button>
+            <Button Color="ButtonColor.Danger" @onclick="() => DeleteStudent(StudentId)">حذف</Button>
+        </FooterTemplate>
+    </Modal>
+    <Grid TItem="Vstudent"
+    DataProvider="StudentsDataProvider"
+    AllowFiltering="true"
+    PageSize="150"
+    AllowPaging="true"
+    AllowSorting="true"
+    FiltersRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-25"
+    Class="table-hover table"
+    HeaderRowCssClass="bg-primary text-white border-bottom-0"
+    Responsive="true">
+        <GridColumns>
+            <GridColumn TItem="Vstudent" HeaderText="رقم الطالب" PropertyName="StudentId" SortKeySelector="item => item.StudentId">
+                @context.StudentId
+            </GridColumn>
+            <GridColumn TItem="Vstudent" HeaderText="كود الطالب" PropertyName="Code" SortKeySelector="item => item.Code">
+                @context.Code
+            </GridColumn>
+            <GridColumn TItem="Vstudent" HeaderText="اسم الطالب" PropertyName="StudentName" SortKeySelector="item => item.StudentName">
+                @context.StudentName
+            </GridColumn>
+            <GridColumn TItem="Vstudent" HeaderText="النوع" PropertyName="IsMaile" SortKeySelector="item => item.IsMaile">
+                @{
+                    var statusIsMaile = context.IsMaile ? "ذكر" : "أنثى";
+                }
+                @statusIsMaile
+            </GridColumn>
+            <GridColumn TItem="Vstudent" HeaderText="البريد الإلكتروني" PropertyName="StudentEmail" SortKeySelector="item => item.StudentEmail">
+                @context.StudentEmail
+            </GridColumn>
+            <GridColumn TItem="Vstudent" HeaderText="رقم الهاتف" PropertyName="StudentPhone" SortKeySelector="item => item.StudentPhone">
+                @context.StudentPhone
+            </GridColumn>
+            <GridColumn TItem="Vstudent" HeaderText="واتساب الطالب" PropertyName="StudentWhatsApp" SortKeySelector="item => item.StudentWhatsApp">
+                @context.StudentWhatsApp
+            </GridColumn>
+            <GridColumn TItem="Vstudent" HeaderText="واتساب الأب" PropertyName="FatherWhatsApp" SortKeySelector="item => item.FatherWhatsApp">
+                @context.FatherWhatsApp
+            </GridColumn>
+            <GridColumn TItem="Vstudent" HeaderText="الصف" PropertyName="GradeName" SortKeySelector="item => item.GradeName">
+                @context.GradeName
+            </GridColumn>
+            <GridColumn TItem="Vstudent" HeaderText="البلد" PropertyName="GradeName" SortKeySelector="item => item.Country">
+                @context.Country
+            </GridColumn>
+            <GridColumn TItem="Vstudent" HeaderText="حالة الطالب" PropertyName="IStatus">
+                @{
+                    var status = context.IStatus ? "مرفود" : "ملتزم";
+                    var buttonClass = context.IStatus ? "btn btn-danger" : "btn btn-success";
+                }
+                <button class="@buttonClass">
+                    @status
+                </button>
+            </GridColumn>
+            <GridColumn TItem="Vstudent" HeaderText="حجز" PropertyName="Operations">
+                <Button Color="ButtonColor.Success" @onclick="() => CreateBranch(context.StudentId)">إضافة حجز</Button>
+            </GridColumn>
+            <GridColumn TItem="Vstudent" HeaderText="تعديل" PropertyName="Operations">
+                <Button Color="ButtonColor.Primary" @onclick="() => EditStudent(context.StudentId)">تعديل</Button>
+            </GridColumn>
+            @if (isAdmin)
+            {
+                <GridColumn TItem="Vstudent" HeaderText="حذف" PropertyName="Operations">
+
+                    <Button Color="ButtonColor.Danger" @onclick="() => OnShowModalClick(context)">حذف</Button>
+                </GridColumn>
+            }
+
+        </GridColumns>
+    </Grid>
+}
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    [Parameter]
+    public int? GradeId { get; set; }
+
+    private bool isAdmin;
+    private Modal modal = default!;
+    private List<Vstudent>? students;
+    private List<ToastMessage> messages = new();
+    private ClaimsPrincipal? user;
+    private string? userRole;
+    public int StudentId;
+    public string? StudentName;
+
+    private async Task<GridDataProviderResult<Vstudent>> StudentsDataProvider(GridDataProviderRequest<Vstudent> request)
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        user = authState.User;
+        var Roles = user?.FindAll(ClaimTypes.Role).ToList();
+        isAdmin = Roles!.Any(role => role.Value == "Admin");
+
+        if (students == null)
+        {
+            string url = "api/Student/VStudents";
+
+            if (GradeId.HasValue)
+            {
+                url = $"api/Student/VStudentsGrade?Gradeid={GradeId.Value}";
+            }
+            students = await Http.GetFromJsonAsync<List<Vstudent>>(url);
+        }        IEnumerable<Vstudent> dataToApply = students ?? Enumerable.Empty<Vstudent>();
+        return await Task.FromResult(request.ApplyTo(dataToApply));
+    }
+
+    private async Task OnShowModalClick(Vstudent student)
+    {
+        StudentId = student.StudentId;
+        StudentName = student.StudentName;
+        await modal.ShowAsync();
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+        StudentId = 0;
+        StudentName = null;
+    }
+    private void CreateBranch(int id)
+    {
+        Navigation.NavigateTo($"/Bookings/createoredit/student/{id}");
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            // var user = authState.User;
+
+            string url = "api/Student/VStudents";
+
+            if (GradeId.HasValue)
+            {
+                url = $"api/Student/VStudentsGrade?Gradeid={GradeId.Value}";
+            }
+            students = await Http.GetFromJsonAsync<List<Vstudent>>(url);
+            // isAdmin = user.IsInRole("Admin");
+        }catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private void EditStudent(int id)
+    {
+        Navigation.NavigateTo($"/student/{id}");
+    }
+
+    private async Task DeleteStudent(int id)
+    {
+        var response = await Http.DeleteAsync($"api/Student/DeleteStudent?id={id}");
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم حذف الطالب بنجاح.");
+            students = await Http.GetFromJsonAsync<List<Vstudent>>("api/Student/VStudents");
+        }
+        else
+        {
+            string errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشل في حذف الطالب. الخطأ: {errorMessage}");
+        }
+        await OnHideModalClick();
+        await OnInitializedAsync();
+    }
+
+    private void CreateStudent()
+    {
+        Navigation.NavigateTo("/student");
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(new ToastMessage
+            {
+                Type = toastType,
+                Title = "تنبيه",
+                Message = message,
+                HelpText = $"{DateTime.Now}"
+            });
+    }
+}

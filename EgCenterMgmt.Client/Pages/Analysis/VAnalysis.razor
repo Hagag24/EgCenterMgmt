@@ -1,0 +1,320 @@
+﻿@using AutoMapper
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin")]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>تحليل مدفوعات الطلاب</PageTitle>
+
+<h3>تحليل مدفوعات الطلاب</h3>
+
+@if (PaymentsAnalysis == null)
+{
+    <p><em>جار التحميل...</em></p>
+}
+else
+{
+<div class="row mb-3">
+    <div class="col-md-4">
+        <Card>
+            <CardBody>
+                <h5>عدد المدفوعات بالحصة</h5>
+                <p>@studySessionCount</p>
+            </CardBody>
+        </Card>
+    </div>
+    <div class="col-md-4">
+        <Card>
+            <CardBody>
+                <h5>عدد المدفوعات بالشهر</h5>
+                <p>@studyMonthCount</p>
+            </CardBody>
+        </Card>
+    </div>
+    <div class="col-md-4">
+        <Card>
+            <CardBody>
+                <h5>عدد المجموعات</h5>
+                <p>@uniqueGroupsCount مجموعة</p>
+            </CardBody>
+        </Card>
+    </div>
+    <div class="col-md-4">
+        <Card>
+            <CardBody>
+                <h5>عدد الطلاب</h5>
+                <p>@uniqueStudentsCount طالب</p>
+            </CardBody>
+        </Card>
+    </div>
+    <div class="col-md-4">
+        <Card>
+            <CardBody>
+                <h5>إجمالي المبلغ المدفوع</h5>
+                <p>@TotalAmount جنيه</p>
+            </CardBody>
+        </Card>
+    </div>
+    <div class="col-md-4">
+        <Card>
+            <CardBody>
+                <h5>إجمالي المبلغ المطلوب</h5>
+                <p>@TotalAmountRequired جنيه</p>
+            </CardBody>
+        </Card>
+    </div>
+    <div class="col-md-4">
+        <Card>
+            <CardBody>
+                <h5>إجمالي الرصيد المتبقي</h5>
+                <p>@TotalBalance جنيه</p>
+            </CardBody>
+        </Card>
+    </div>
+    <div class="col-md-4">
+        <Card>
+            <CardBody>
+                <h5>إجمالي المبلغ المستحق للمعلم</h5>
+                <p>@TotalTeacherAmount جنيه</p>
+            </CardBody>
+        </Card>
+    </div>
+    <div class="col-md-4">
+        <Card>
+            <CardBody>
+                <h5>إجمالي المبلغ المستحق للمركز</h5>
+                <p>@TotalCenterAmount جنيه</p>
+            </CardBody>
+        </Card>
+    </div>
+</div>
+
+
+    <Grid TItem="VPaymentAnalysis"
+          DataProvider="PaymentsAnalysisDataProvider"
+          AllowFiltering="true"
+          AllowSorting="true"
+          Class="table-hover table"
+          FiltersRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-25"
+          HeaderRowCssClass="bg-primary text-white border-bottom-0"
+          PageSize="150"
+          AllowPaging="true"
+          Responsive="true">
+        <GridColumns>
+            <!-- Columns as defined earlier -->
+            <GridColumn TItem="VPaymentAnalysis" HeaderText="اسم المدرس" PropertyName="TeacherName" SortKeySelector="item => item.TeacherName">
+                @context.TeacherName
+            </GridColumn>
+            <GridColumn TItem="VPaymentAnalysis" HeaderText="اسم المجموعة" PropertyName="GroupName" SortKeySelector="item => item.GroupName">
+                @context.GroupName
+            </GridColumn>
+            <GridColumn TItem="VPaymentAnalysis" HeaderText="اسم المادة" PropertyName="SubjectName" SortKeySelector="item => item.SubjectName">
+                @context.SubjectName
+            </GridColumn>
+            <GridColumn TItem="VPaymentAnalysis" HeaderText="اسم الطالب" PropertyName="StudentName" SortKeySelector="item => item.StudentName">
+                @context.StudentName
+            </GridColumn>
+            <GridColumn TItem="VPaymentAnalysis" HeaderText="تاريخ الدفع" PropertyName="PaymentDate" SortKeySelector="item => item.PaymentDate">
+                @context.PaymentDate?.ToString("yyyy-MM-dd")
+            </GridColumn>
+            <GridColumn TItem="VPaymentAnalysis" HeaderText="المبلغ المطلوب" PropertyName="AmountRequired" SortKeySelector="item => item.AmountRequired">
+                @context.AmountRequired?.ToString("0.00")
+            </GridColumn>
+            <GridColumn TItem="VPaymentAnalysis" HeaderText="المبلغ" PropertyName="Amount" SortKeySelector="item => item.Amount">
+                @context.Amount?.ToString("0.00")
+            </GridColumn>
+            <GridColumn TItem="VPaymentAnalysis" HeaderText="المتبقي" PropertyName="Balance" SortKeySelector="item => item.Balance">
+                @context.Balance?.ToString("0.00")
+            </GridColumn>
+            <GridColumn TItem="VPaymentAnalysis" HeaderText="نوع الدفع" PropertyName="PaymentType" SortKeySelector="item => item.PaymentType">
+                @context.PaymentType
+            </GridColumn>
+            <GridColumn TItem="VPaymentAnalysis" HeaderText="اسم الفرع" PropertyName="BranchName" SortKeySelector="item => item.BranchName">
+                @context.BranchName
+            </GridColumn>
+            <GridColumn TItem="VPaymentAnalysis" HeaderText="موقع الفرع" PropertyName="BranchLocation" SortKeySelector="item => item.BranchLocation">
+                @context.BranchLocation
+            </GridColumn>
+        </GridColumns>
+    </Grid>
+}
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    [Parameter] public int? StudentId { get; set; }
+    [Parameter] public int? GroupId { get; set; }
+    [Parameter] public int? TeacherId { get; set; }
+
+    [Parameter] public DateTime? FromDate { get; set; }
+    [Parameter] public DateTime? ToDate { get; set; }
+
+    private List<VPaymentAnalysis>? PaymentsAnalysis;
+    private List<ToastMessage> messages = new();
+    private List<VPaymentAnalysis>? FilteredPaymentsAnalysis;
+    private List<CenterRate>? centerRate;
+    private ClaimsPrincipal? user;
+
+    private decimal? TotalAmount = 0;
+    private decimal? TotalAmountRequired = 0;
+    private decimal? TotalBalance = 0;
+    private decimal? TotalCenterAmount = 0;
+    private decimal? TotalTeacherAmount = 0;
+    int? uniqueGroupsCount;
+    int? uniqueStudentsCount;
+    int? studySessionCount;
+    int? studyMonthCount;
+    private async Task<GridDataProviderResult<VPaymentAnalysis>> PaymentsAnalysisDataProvider(GridDataProviderRequest<VPaymentAnalysis> request)
+    {
+        try
+        {
+            if (PaymentsAnalysis == null)
+                await LoadAttendancesList();
+
+            if (centerRate == null)
+                centerRate = await Http.GetFromJsonAsync<List<CenterRate>>("api/CenterRate/GetRates");
+            var Data = Filter(request);
+
+            StateHasChanged();
+
+            var result = request.ApplyTo(Data ?? Enumerable.Empty<VPaymentAnalysis>());
+            return await Task.FromResult(result);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error : " + ex.Message);
+            return await Task.FromResult(request.ApplyTo(FilteredPaymentsAnalysis ?? Enumerable.Empty<VPaymentAnalysis>()));
+        }
+    }
+
+    List<VPaymentAnalysis> Filter(GridDataProviderRequest<VPaymentAnalysis> request)
+    {
+        try
+        {
+            var query = PaymentsAnalysis?.AsQueryable();
+
+            if (request.Filters != null && request.Filters.Any())
+            {
+                foreach (var filter in request.Filters)
+                {
+                    var filterValue = filter.Value?.ToString();
+                    if (string.IsNullOrEmpty(filterValue))
+                        continue;
+
+                    filterValue = filterValue.Trim().ToLower();
+
+                    query = query!.Where(p =>
+                    (!string.IsNullOrEmpty(p.TeacherName) && p.TeacherName.ToLower().Contains(filterValue)) ||
+                    (!string.IsNullOrEmpty(p.GroupName) && p.GroupName.ToLower().Contains(filterValue)) ||
+                    (!string.IsNullOrEmpty(p.SubjectName) && p.SubjectName.ToLower().Contains(filterValue)) ||
+                    (!string.IsNullOrEmpty(p.GradeName) && p.GradeName.ToLower().Contains(filterValue)) ||
+                    (!string.IsNullOrEmpty(p.Code) && p.Code.ToLower().Contains(filterValue)) ||
+                    (!string.IsNullOrEmpty(p.StudentName) && p.StudentName.ToLower().Contains(filterValue)) ||
+                    (!string.IsNullOrEmpty(p.PaymentType) && p.PaymentType.ToLower().Contains(filterValue)) ||
+                    (p.AmountRequired.HasValue && p.AmountRequired.Value.ToString().Contains(filterValue)) ||
+                    (p.Amount.HasValue && p.Amount.Value.ToString().Contains(filterValue)) ||
+                    (p.Balance.HasValue && p.Balance.Value.ToString().Contains(filterValue)) ||
+                    (p.PaymentDate.HasValue && p.PaymentDate.Value.ToString("yyyy-MM-dd").Contains(filterValue)) ||
+                    (p.ServingPrice.HasValue && p.ServingPrice.Value.ToString().Contains(filterValue)) ||
+                    (p.PricePerMonth.HasValue && p.PricePerMonth.Value.ToString().Contains(filterValue)) ||
+                    (p.NumberDayeSattendees.HasValue && p.NumberDayeSattendees.Value.ToString().Contains(filterValue)) ||
+                    (p.MaxLenth.HasValue && p.MaxLenth.Value.ToString().Contains(filterValue)) ||
+                    (p.BranchId.HasValue && p.BranchId.Value.ToString().Contains(filterValue)) ||
+                    (p.TeacherId.HasValue && p.TeacherId.Value.ToString().Contains(filterValue)) ||
+                    (p.StudentId.HasValue && p.StudentId.Value.ToString().Contains(filterValue))
+                );
+                }
+            }
+
+            FilteredPaymentsAnalysis = query!.ToList();
+
+            studySessionCount = FilteredPaymentsAnalysis.Count(s => s.PaymentType == "حصة");
+            studyMonthCount = FilteredPaymentsAnalysis.Count(s => s.PaymentType == "شهري" && s.AmountRequired != null);
+
+            uniqueGroupsCount = FilteredPaymentsAnalysis.Select(s => s.GroupId).Distinct().Count();
+            uniqueStudentsCount = FilteredPaymentsAnalysis.Select(s => s.StudentId).Distinct().Count();
+
+            var centerPricePerSession = centerRate != null && centerRate.Count > 0 ? centerRate[0].RateSession : 0;
+            var centerPricePerMonth = centerRate != null && centerRate.Count > 0 ? centerRate[0].RateMonthly : 0;
+
+            TotalAmount = FilteredPaymentsAnalysis?.Sum(p => p.Amount ?? 0) ?? 0;
+            TotalAmountRequired = FilteredPaymentsAnalysis?.Sum(p => p.AmountRequired ?? 0) ?? 0;
+            TotalBalance = TotalAmountRequired - TotalAmount;
+
+            decimal totaMonth = FilteredPaymentsAnalysis?.Where(s => s.PaymentType == "شهري").Sum(p => p.Amount ?? 0) ?? 0;
+            decimal totalSession = FilteredPaymentsAnalysis?.Where(s => s.PaymentType == "حصة").Sum(p => p.Amount ?? 0) ?? 0;
+            decimal totalfree = FilteredPaymentsAnalysis?.Where(s => s.PaymentType == "معفي من المعلم").Sum(p => p.Amount ?? 0) ?? 0;
+
+            TotalTeacherAmount = (totaMonth - (studyMonthCount * centerPricePerMonth)) + (totalSession - (studySessionCount * centerPricePerSession));
+            TotalCenterAmount = (studyMonthCount * centerPricePerMonth) + (studySessionCount * centerPricePerSession) + totalfree;
+            return FilteredPaymentsAnalysis!;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Filtered Error : " + ex.Message);
+            return FilteredPaymentsAnalysis!;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAttendancesList();
+    }
+
+    private async Task LoadAttendancesList()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+            user = authState.User;
+
+
+
+            string url = "api/Analytics/VPaymentAnalysis";
+
+            if (StudentId.HasValue)
+            {
+                url = $"api/Analytics/VPaymentAnalysisstudent?studentid={StudentId.Value}";
+            }
+            else if (GroupId.HasValue)
+            {
+                url = $"api/Analytics/VPaymentAnalysisgroup?groupid={GroupId.Value}";
+            }
+            else if (TeacherId.HasValue)
+            {
+                url = $"api/Analytics/VPaymentAnalysistech?techid={TeacherId.Value}";
+            }
+            if (FromDate.HasValue)
+            {
+                url += $"&fromDate={FromDate.Value.ToString("yyyy-MM-dd")}";
+            }
+            if (ToDate.HasValue)
+            {
+                url += $"&toDate={ToDate.Value.ToString("yyyy-MM-dd")}";
+            }
+
+            // إرسال الطلب وتحميل البيانات
+            PaymentsAnalysis = await Http.GetFromJsonAsync<List<VPaymentAnalysis>>(url);
+            centerRate = await Http.GetFromJsonAsync<List<CenterRate>>("api/CenterRate/GetRates");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            var massge = $"فشل في تحميل البيانات. الخطأ: {ex.Message} : {DateTime.Now}";
+            ShowMessage(ToastType.Danger, massge);
+        }
+
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(new ToastMessage
+            {
+                Type = toastType,
+                Title = "تنبيه",
+                Message = message,
+                HelpText = $"{DateTime.Now}"
+            });
+    }
+}

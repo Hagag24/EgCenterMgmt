@@ -1,0 +1,209 @@
+﻿@page "/PaymentAnalysis"
+@attribute [Authorize(Roles = "Admin")]
+@inject HttpClient Http
+
+@if (!attendancesVisible)
+{
+    <main class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title">كشف الحساب</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="searchType" class="form-label">اختر نوع الكشف</label>
+                            <select id="searchType" class="form-select" @bind="searchType">
+                                <option value="">اختر</option>
+                                <option value="student">كشف بكود الطالب</option>
+                                <option value="group">كشف باسم المجموعة</option>
+                                <option value="teacher">كشف باسم المعلم</option>
+                            </select>
+                        </div>
+
+                        @if (searchType == "student")
+                        {
+                            <div class="mb-3">
+                                <label for="studentId" class="form-label">كود الطالب</label>
+                                <input id="studentId" class="form-control" @oninput="FilterStudents" placeholder="اكشف عن الطالب ...." @onclick="() => isStudentDropdownOpen = true" />
+                                <select id="studentDropdown" class="form-select mt-2" style="display:@GetDropdownDisplay(isStudentDropdownOpen)" @bind="selectedStudentId">
+                                    <option value="">اختر الطالب</option>
+                                    @if (filteredStudents != null)
+                                    {
+                                        @foreach (var student in filteredStudents)
+                                        {
+                                            <option value="@student.StudentId">@student.StudentName</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                        }
+                        else if (searchType == "group")
+                        {
+                            <div class="mb-3">
+                                <label for="groupId" class="form-label">إسم المجموعة</label>
+                                <input id="groupId" class="form-control" @oninput="FilterGroups" placeholder="اكشف عن المجموعة ...." @onclick="() => isGroupDropdownOpen = true" />
+                                <select id="groupDropdown" class="form-select mt-2" style="display:@GetDropdownDisplay(isGroupDropdownOpen)" @bind="selectedGroupId">
+                                    <option value="">اختر المجموعة</option>
+                                    @if (filteredGroups != null)
+                                    {
+                                        @foreach (var group in filteredGroups)
+                                        {
+                                            <option value="@group.GroupId">@group.GroupName</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                        }
+                        else if (searchType == "teacher")
+                        {
+                            <div class="mb-3">
+                                <label for="teacherId" class="form-label">إسم المعلم</label>
+                                <input id="teacherId" class="form-control" @oninput="FilterTeachers" placeholder="اكشف عن المعلم ...." @onclick="() => isTeacherDropdownOpen = true" />
+                                <select id="teacherDropdown" class="form-select mt-2" style="display:@GetDropdownDisplay(isTeacherDropdownOpen)" @bind="selectedTeacherId">
+                                    <option value="">اختر المعلم</option>
+                                    @if (filteredTeachers != null)
+                                    {
+                                        @foreach (var teacher in filteredTeachers)
+                                        {
+                                            <option value="@teacher.TeacherId">@teacher.TeacherName</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                        }
+                        <div class="mb-3">
+                            <label for="FromDate" class="form-label">تاريخ البدء</label>
+                            <input type="date" id="FromDate" class="form-control" @bind="FromDate" />
+                        </div>
+                        <div class="mb-3">
+                            <label for="ToDate" class="form-label">تاريخ الانتهاء</label>
+                            <input type="date" id="ToDate" class="form-control" @bind="ToDate" />
+                        </div>
+
+                        <Button Color="ButtonColor.Success" class="w-100 mt-3" @onclick="ShowAttendances">كشف الحساب</Button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+}
+else
+{
+    <div class="container my-5">
+        <Button Color="ButtonColor.Secondary" class="w-100 mt-3" @onclick="()=>attendancesVisible = false">الرجوع للفلتر</Button>
+    </div>
+
+    <VAnalysis GroupId="selectedGroupId"
+    StudentId="selectedStudentId"
+    TeacherId="selectedTeacherId"
+    FromDate="FromDate"
+    ToDate="ToDate" />
+}
+
+@code {
+    private IEnumerable<GroupDto>? groups;
+    private IEnumerable<StudentDto>? students;
+    private IEnumerable<TeacherDto>? teachers;
+
+    private bool isStudentDropdownOpen = false;
+    private bool isGroupDropdownOpen = false;
+    private bool isTeacherDropdownOpen = false;
+    private bool attendancesVisible = false;
+
+    private List<GroupDto>? filteredGroups;
+    private List<StudentDto>? filteredStudents;
+    private List<TeacherDto>? filteredTeachers;
+
+    private string? searchType;
+    private int? selectedStudentId;
+    private int? selectedGroupId;
+    private int? selectedTeacherId;
+
+    private DateTime? FromDate;
+    private DateTime? ToDate;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            groups = await Http.GetFromJsonAsync<IEnumerable<GroupDto>>("api/Group/GetGroups");
+            students = await Http.GetFromJsonAsync<IEnumerable<StudentDto>>("api/Student/GetStudents");
+            teachers = await Http.GetFromJsonAsync<IEnumerable<TeacherDto>>("api/Teacher/GetTeachers");
+
+            filteredGroups = groups?.ToList();
+            filteredStudents = students?.ToList();
+            filteredTeachers = teachers?.ToList();
+            FromDate = DateTime.Now.AddDays(-30);
+            ToDate = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message.ToString());
+        }
+    }
+
+    private void FilterStudents(ChangeEventArgs e)
+    {
+        string filterValue = e.Value?.ToString()?.ToLower() ?? string.Empty;
+        filteredStudents = string.IsNullOrWhiteSpace(filterValue)
+            ? students?.ToList()
+            : students?.Where(s => s.Code!.ToLower().Contains(filterValue)).ToList();
+        isStudentDropdownOpen = true;
+
+        StateHasChanged();
+    }
+
+    private void FilterGroups(ChangeEventArgs e)
+    {
+        string filterValue = e.Value?.ToString()?.ToLower() ?? string.Empty;
+        filteredGroups = string.IsNullOrWhiteSpace(filterValue)
+            ? groups?.ToList()
+            : groups?.Where(g => g.GroupName!.ToLower().Contains(filterValue)).ToList();
+        isGroupDropdownOpen = true;
+
+        StateHasChanged();
+    }
+
+    private void FilterTeachers(ChangeEventArgs e)
+    {
+        string filterValue = e.Value?.ToString()?.ToLower() ?? string.Empty;
+        filteredTeachers = string.IsNullOrWhiteSpace(filterValue)
+            ? teachers?.ToList()
+            : teachers?.Where(t => t.TeacherName!.ToLower().Contains(filterValue)).ToList();
+        isTeacherDropdownOpen = true;
+
+        StateHasChanged();
+    }
+
+    private string GetDropdownDisplay(bool isOpen)
+    {
+        return isOpen ? "block" : "none";
+    }
+
+    private void ShowAttendances()
+    {
+        @if (searchType == "student")
+        {
+            selectedGroupId = null;
+            selectedTeacherId = null;
+        }
+        else if (searchType == "group")
+        {
+            selectedTeacherId = null;
+            selectedStudentId = null;
+        }
+        else if (searchType == "teacher")
+        {
+            selectedStudentId = null;
+            selectedGroupId = null;
+        }
+        if (selectedGroupId != null || selectedTeacherId != null || selectedStudentId != null)
+        {
+            attendancesVisible = true;
+            StateHasChanged();
+        }
+    }
+}

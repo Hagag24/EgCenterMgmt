@@ -1,0 +1,111 @@
+﻿@page "/user-profile"
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@attribute [Authorize(Roles = "Admin, Assistant")]
+
+<div class="container mt-5">
+    <h3 class="text-center mb-4">تعديل بيانات البروفايل</h3>
+
+    @if (user == null)
+    {
+        <p>جاري التحميل...</p>
+    }
+    else
+    {
+        <div class="card shadow">
+            <div class="card-header text-center bg-primary text-white">
+                <h5>بيانات المستخدم</h5>
+            </div>
+            <div class="card-body">
+                <EditForm Model="user" OnValidSubmit="HandleValidSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-3">
+                        <label for="userName" class="form-label">اسم المستخدم</label>
+                        <InputText id="userName" class="form-control" @bind-Value="user.UserName" />
+                        <ValidationMessage For="@(() => user.UserName)" class="text-danger" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="email" class="form-label">البريد الإلكتروني</label>
+                        <InputText id="email" type="email" class="form-control" @bind-Value="user.Email" />
+                        <ValidationMessage For="@(() => user.Email)" class="text-danger" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="natinalId" class="form-label">الرقم القومي</label>
+                        <InputText id="natinalId" class="form-control" @bind-Value="user.NatinalId" />
+                        <ValidationMessage For="@(() => user.NatinalId)" class="text-danger" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="address" class="form-label">العنوان</label>
+                        <InputText id="address" class="form-control" @bind-Value="user.Address" />
+                        <ValidationMessage For="@(() => user.Address)" class="text-danger" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="phoneNumber" class="form-label">رقم الهاتف</label>
+                        <InputText id="phoneNumber" class="form-control" @bind-Value="user.PhoneNumber" />
+                        <ValidationMessage For="@(() => user.PhoneNumber)" class="text-danger" />
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block">تعديل</button>
+                </EditForm>
+            </div>
+        </div>
+
+        <div class="mt-4 text-center">
+            <Button Color="ButtonColor.Danger" @onclick="() => ResetPassword(user.UserId)">إعادة تعيين كلمة المرور</Button>
+        </div>
+    }
+</div>
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    private EditUserDto? user;
+    private List<ToastMessage> messages = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            user = await Http.GetFromJsonAsync<EditUserDto>($"api/UserManagement/GetUserById?userId={UserDaitels.UserId}");
+        }catch(Exception ex){
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        var response = await Http.PutAsJsonAsync("api/UserManagement/UpdateUser", user);
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم تحديث البروفايل بنجاح.");
+        }
+        else
+        {
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشل في تحديث البروفايل. الخطأ: {errorMessage}");
+        }
+    }
+
+    private void ResetPassword(string userId)
+    {
+        NavigationManager.NavigateTo($"/reset-password/{userId}");
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(new ToastMessage
+            {
+                Type = toastType,
+                Title = "تنبيه",
+                Message = message,
+                HelpText = $"{DateTime.Now}"
+            });
+    }
+}

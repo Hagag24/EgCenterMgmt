@@ -1,0 +1,59 @@
+﻿.custom-card {
+    margin-bottom: 1.5rem;
+    border-radius: 12px;
+    padding: 2rem;
+    color: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+    .custom-card:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+    }
+
+.custom-card-1 {
+    background-color: #b23c35;
+    font-size: 1.4rem;
+    border: 2px solid #a12e2b;
+}
+
+.custom-card-2 {
+    background-color: #4b4da8;
+    font-size: 1.3rem;
+    border: 2px solid #3e3a91;
+}
+
+.custom-card-3 {
+    background-color: #257230;
+    font-size: 1.5rem;
+    border: 2px solid #1e5e2b;
+}
+
+.custom-card-4 {
+    background-color: #c28e00;
+    font-size: 1.2rem;
+    border: 2px solid #a87b00;
+}
+
+.custom-card-5 {
+    background-color: #a0302c;
+    font-size: 1.6rem;
+    border: 2px solid #8d2522;
+}
+
+.custom-card-6 {
+    background-color: #2a56a0;
+    font-size: 1.3rem;
+    border: 2px solid #1e4378;
+}
+.card-number {
+    font-size: 2rem;
+    color: #ffffff; /* اللون الأساسي للرقم */
+    transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+.custom-card:hover .card-number {
+    color: #ffff66; /* لون أصفر فاتح مريح عند الهوفر */
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8); /* تأثير توهج */
+}

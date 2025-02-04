@@ -1,0 +1,174 @@
+﻿@page "/groupschedule"
+@page "/groupschedule/{id:int}"
+@page "/groupschedule/group/{groupid:int}"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>@(id.HasValue ? "تعديل جدول المجموعة" : "إنشاء جدول مجموعة جديد")</PageTitle>
+
+<div class="card my-4">
+    <div class="card-header">
+        <h3 class="card-title text-center">@((id.HasValue ? "تعديل جدول المجموعة" : "إنشاء جدول مجموعة جديد"))</h3>
+    </div>
+    <div class="card-body">
+        @if (groupScheduleDto == null || groups == null)
+        {
+            <p><em>جار التحميل...</em></p>
+        }
+        else
+        {
+            <EditForm Model="groupScheduleDto" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="mb-3">
+                    <label for="groupId" class="form-label">رقم المجموعة</label>
+                    <input id="groupId" class="form-control" @oninput="FilterGroups" placeholder="ابحث عن المجموعة ...." @onclick="() => isGroupDropdownOpen = true" />
+                    <select id="groupDropdown" class="form-control" style="display:@GetDropdownDisplay(isGroupDropdownOpen)" @bind="groupScheduleDto.GroupId">
+                        <option value="">اختر المجموعة</option>
+                        @if (filteredGroups != null)
+                        {
+                            @foreach (var group in filteredGroups)
+                            {
+                                <option value="@group.GroupId">@group.GroupName</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="dayOfWeek" class="form-label">يوم الأسبوع</label>
+                    <InputSelect id="dayOfWeek" class="form-select" @bind-Value="groupScheduleDto.DayOfWeek">
+                        <option value="">اختر اليوم</option>
+                        <option value="السبت">السبت</option>
+                        <option value="الأحد">الأحد</option>
+                        <option value="الإثنين">الإثنين</option>
+                        <option value="الثلاثاء">الثلاثاء</option>
+                        <option value="الأربعاء">الأربعاء</option>
+                        <option value="الخميس">الخميس</option>
+                        <option value="الجمعة">الجمعة</option>
+                    </InputSelect>
+                </div>
+
+                <div class="mb-3">
+                    <label for="startTime" class="form-label">وقت البداية</label>
+                    <TimeInput id="startTime" class="form-control" @bind-Value="groupScheduleDto.StartTime" />
+                </div>
+                <div class="mb-3">
+                    <label for="endTime" class="form-label">وقت النهاية</label>
+                    <TimeInput id="endTime" class="form-control" @bind-Value="groupScheduleDto.EndTime" />
+                </div>
+                <div class="d-flex justify-content-between">
+                    <Button Color="ButtonColor.Success" @onclick="HandleValidSubmit">@((id.HasValue ? "تحديث" : "إنشاء"))</Button>
+                    <Button Color="ButtonColor.Danger" @onclick="Cancel">إلغاء</Button>
+                </div>
+            </EditForm>
+        }
+    </div>
+</div>
+
+<Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+
+@code {
+    [Parameter] public int? id { get; set; }
+    [Parameter] public int? groupid { get; set; }
+    private GroupScheduleDto? groupScheduleDto = new GroupScheduleDto();
+    private IEnumerable<GroupDto>? groups;
+    private List<GroupDto>? filteredGroups;
+    private bool isGroupDropdownOpen = false;
+    private Modal modal = default!;
+    private List<ToastMessage> messages = new();
+
+    private void FilterGroups(ChangeEventArgs e)
+    {
+        string filterValue = e.Value?.ToString()?.ToLower() ?? string.Empty;
+        filteredGroups = string.IsNullOrWhiteSpace(filterValue)
+            ? groups?.ToList()
+            : groups?.Where(g => g.GroupName!.ToLower().Contains(filterValue)).ToList();
+        isGroupDropdownOpen = true;
+        StateHasChanged();
+    }
+
+    private string GetDropdownDisplay(bool isOpen)
+    {
+        return isOpen ? "block" : "none";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (id.HasValue)
+        {
+            groupScheduleDto = await Http.GetFromJsonAsync<GroupScheduleDto>($"api/GroupSchedule/GetGroupSchedule/{id}");
+        }
+
+        groups = await Http.GetFromJsonAsync<List<GroupDto>>("api/Group/GetGroups");
+        filteredGroups = groups?.ToList();
+
+        if (groupid.HasValue)
+        {
+            isGroupDropdownOpen = true;
+            StateHasChanged();
+            if (groupScheduleDto != null)
+            {
+                groupScheduleDto.GroupId = groupid;
+            }
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        HttpResponseMessage response;
+
+        if (id.HasValue)
+        {
+            response = await Http.PutAsJsonAsync($"api/GroupSchedule/PutGroupSchedule/{id}", groupScheduleDto);
+        }
+        else
+        {
+            response = await Http.PostAsJsonAsync("api/GroupSchedule/PostGroupSchedule", groupScheduleDto);
+        }
+
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم حفظ التعديلات بنجاح.");
+        }
+        else
+        {
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشل في حفظ التعديلات. الخطأ: {errorMessage}");
+        }
+    }
+
+    private void Cancel()
+    {
+        if (groupid.HasValue)
+        {
+            Navigation.NavigateTo("/groups");
+        }
+        else
+        {
+            Navigation.NavigateTo("/groupschedules");
+        }
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(CreateToastMessage(toastType, message));
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    {
+        return new ToastMessage
+            {
+                Type = toastType,
+                Title = "عملية الحفظ",
+                HelpText = $"{DateTime.Now}",
+                Message = message,
+            };
+    }
+
+    private async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+    }
+}

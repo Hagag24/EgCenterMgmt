@@ -1,0 +1,123 @@
+﻿@page "/teacher"
+@page "/teacher/{id:int}"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>@(id.HasValue ? "تعديل المدرس" : "إنشاء مدرس جديد")</PageTitle>
+
+<div class="container mt-5">
+    @if (teacherDto == null)
+    {
+        <p><em>جار التحميل...</em></p>
+    }
+    else
+    {
+        <div class="card shadow">
+            <div class="card-header text-center bg-scandary text-white">
+                <h5 style="color: black;">@((id.HasValue ? "تعديل بيانات المدرس" : "إدخال بيانات مدرس جديد"))</h5>
+            </div>
+            <div class="card-body">
+                <EditForm Model="teacherDto" OnValidSubmit="HandleValidSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-3">
+                        <label for="teacherName" class="form-label">اسم المدرس</label>
+                        <InputText id="teacherName" class="form-control" @bind-Value="teacherDto.TeacherName" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="teacherEmail" class="form-label">البريد الإلكتروني</label>
+                        <InputText id="teacherEmail" class="form-control" @bind-Value="teacherDto.TeacherEmail" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="teacherPhone" class="form-label">رقم الهاتف</label>
+                        <InputText id="teacherPhone" class="form-control" @bind-Value="teacherDto.TeacherPhone" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="teacherWhatsApp" class="form-label">رقم الواتساب</label>
+                        <InputText id="teacherWhatsApp" class="form-control" @bind-Value="teacherDto.TeacherWhatsApp" />
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="subjectId" class="col-sm-3 col-form-label">المادة</label>
+                        <div class="col-sm-9">
+                            <select id="subjectId" class="form-control" @bind="teacherDto.TeacherSpecialization">
+                                <option value="">اختر المادة</option>
+                                @if (subjects is not null)
+                                {
+                                    @foreach (var subject in subjects)
+                                    {
+                                        <option value="@subject.SubjectName">@subject.SubjectName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <Button Color="ButtonColor.Success" @onclick="HandleValidSubmit">@((id.HasValue ? "تحديث" : "إنشاء"))</Button>
+                        <Button Color="ButtonColor.Danger" @onclick="Cancel">إلغاء</Button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <Toasts class="p-3" Messages="messages" Placement="ToastsPlacement.TopRight" />
+</div>
+
+@code {
+    [Parameter] public int? id { get; set; }
+    private TeacherDto? teacherDto = new TeacherDto();
+    private List<SubjectDto>? subjects = new();
+    private List<ToastMessage> messages = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (id.HasValue)
+        {
+            teacherDto = await Http.GetFromJsonAsync<TeacherDto>($"api/Teacher/GetTeacher/{id}");
+        }
+        subjects = await Http.GetFromJsonAsync<List<SubjectDto>>("api/Subject/GetSubjects");
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        HttpResponseMessage response;
+
+        if (id.HasValue)
+        {
+            response = await Http.PutAsJsonAsync($"api/Teacher/UpdateTeacher/{id}", teacherDto);
+        }
+        else
+        {
+            response = await Http.PostAsJsonAsync("api/Teacher/CreateTeacher", teacherDto);
+        }
+
+        if (response.IsSuccessStatusCode)
+        {
+            ShowMessage(ToastType.Success, "تم حفظ المعلم بنجاح.");
+            Navigation.NavigateTo("/teachers");
+        }
+        else
+        {
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            ShowMessage(ToastType.Danger, $"فشل في حفظ المعلم. الخطأ: {errorMessage}");
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/teachers");
+    }
+
+    private void ShowMessage(ToastType toastType, string message)
+    {
+        messages.Add(new ToastMessage
+            {
+                Type = toastType,
+                Title = "تنبيه",
+                Message = message,
+                HelpText = $"{DateTime.Now}"
+            });
+    }
+}
